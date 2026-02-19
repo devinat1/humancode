@@ -118,6 +118,8 @@ if (!Script.preview) {
   const tap = `https://x-access-token:${token}@github.com/devinat1/homebrew-tap.git`
   await $`rm -rf ./dist/homebrew-tap`
   await $`git clone ${tap} ./dist/homebrew-tap`
+  await $`cd ./dist/homebrew-tap && git config user.name "github-actions[bot]"`
+  await $`cd ./dist/homebrew-tap && git config user.email "github-actions[bot]@users.noreply.github.com"`
   await Bun.file("./dist/homebrew-tap/humancode.rb").write(homebrewFormula)
   await $`cd ./dist/homebrew-tap && git add humancode.rb`
   await $`cd ./dist/homebrew-tap && git commit -m "Update to v${Script.version}"`
