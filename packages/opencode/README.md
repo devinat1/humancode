@@ -1,15 +1,24 @@
-# js
+# HumanCode
 
-To install dependencies:
+The AI coding agent that writes code with you, not for you.
 
-```bash
-bun install
-```
-
-To run:
+## Install
 
 ```bash
-bun run index.ts
+npm i -g humancode
+brew install humancode
 ```
 
-This project was created using `bun init` in bun v1.2.12. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+## Usage
+
+```bash
+humancode
+```
+
+## Debug Mode
+
+HumanCode includes a debug agent that writes code one step at a time and walks you through each step with the VS Code debugger. Set breakpoints, inspect variables, and step through execution to understand exactly what changed and why. Switch to it with `Tab`.
+
+## License
+
+MIT

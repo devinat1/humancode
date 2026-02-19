@@ -160,10 +160,27 @@ export namespace MCP {
     return typeof entry === "object" && entry !== null && "type" in entry
   }
 
+  const DEFAULT_MCP_SERVERS: Record<string, Config.Mcp> = {
+    debugger: {
+      type: "local",
+      command: ["npx", "-y", "debugger-mcp-server"],
+    },
+  }
+
+  async function getEffectiveMcpConfig() {
+    const cfg = await Config.get()
+    const config: Record<string, McpEntry> = { ...cfg.mcp }
+    for (const [key, defaultEntry] of Object.entries(DEFAULT_MCP_SERVERS)) {
+      if (!(key in config)) {
+        config[key] = defaultEntry
+      }
+    }
+    return config
+  }
+
   const state = Instance.state(
     async () => {
-      const cfg = await Config.get()
-      const config = cfg.mcp ?? {}
+      const config = await getEffectiveMcpConfig()
       const clients: Record<string, MCPClient> = {}
       const status: Record<string, Status> = {}
 
@@ -495,8 +512,7 @@ export namespace MCP {
 
   export async function status() {
     const s = await state()
-    const cfg = await Config.get()
-    const config = cfg.mcp ?? {}
+    const config = await getEffectiveMcpConfig()
     const result: Record<string, Status> = {}
 
     // Include all configured MCPs from config, not just connected ones
@@ -513,8 +529,7 @@ export namespace MCP {
   }
 
   export async function connect(name: string) {
-    const cfg = await Config.get()
-    const config = cfg.mcp ?? {}
+    const config = await getEffectiveMcpConfig()
     const mcp = config[name]
     if (!mcp) {
       log.error("MCP config not found", { name })
@@ -567,7 +582,7 @@ export namespace MCP {
     const result: Record<string, Tool> = {}
     const s = await state()
     const cfg = await Config.get()
-    const config = cfg.mcp ?? {}
+    const config = await getEffectiveMcpConfig()
     const clientsSnapshot = await clients()
     const defaultTimeout = cfg.experimental?.mcp_timeout
 
