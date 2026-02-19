@@ -2,6 +2,8 @@
 
 The AI coding agent that writes code with you, not for you.
 
+Demo: https://www.youtube.com/watch?v=RB2JR6vfrWY
+
 ## Install
 
 ```bash
