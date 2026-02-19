@@ -35,7 +35,7 @@ const VERSION = await (async () => {
   if (IS_PREVIEW) return `0.0.0-${CHANNEL}-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}`
   const version = await fetch("https://registry.npmjs.org/humancode/latest")
     .then((res) => {
-      if (!res.ok) throw new Error(res.statusText)
+      if (!res.ok) return { version: "0.0.0" }
       return res.json()
     })
     .then((data: any) => data.version)
