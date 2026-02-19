@@ -1,0 +1,79 @@
+name: Publish to npm
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Bump major, minor, or patch"
+        required: false
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build all platforms
+        run: bun run build
+        working-directory: packages/opencode
+        env:
+          OPENCODE_BUMP: ${{ inputs.bump || 'patch' }}
+
+      - name: Create release archives
+        working-directory: packages/opencode
+        run: |
+          for dir in dist/humancode-*/; do
+            name=$(basename "$dir")
+            if [[ "$name" == *linux* ]]; then
+              tar -czf "dist/${name}.tar.gz" -C "${dir}bin" .
+            else
+              (cd "${dir}bin" && zip -r "../../${name}.zip" .)
+            fi
+          done
+
+      - name: Determine version
+        id: version
+        working-directory: packages/opencode
+        run: |
+          VERSION=$(node -e "console.log(require('./dist/humancode-darwin-arm64/package.json').version)")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        working-directory: packages/opencode
+        run: |
+          gh release create "v$VERSION" dist/*.zip dist/*.tar.gz \
+            --title "v$VERSION" --generate-notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Publish npm + update Homebrew tap
+        working-directory: packages/opencode
+        run: ./script/publish.ts
+        env:
+          OPENCODE_BUMP: ${{ inputs.bump || 'patch' }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
