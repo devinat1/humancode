@@ -113,14 +113,14 @@ jobs:
           fetch-tags: true
 
       - uses: apple-actions/import-codesign-certs@v2
-        if: ${{ runner.os == 'macOS' }}
+        if: ${{ runner.os == 'macOS' && secrets.APPLE_CERTIFICATE != '' }}
         with:
           keychain: build
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
       - name: Verify Certificate
-        if: ${{ runner.os == 'macOS' }}
+        if: ${{ runner.os == 'macOS' && secrets.APPLE_CERTIFICATE != '' }}
         run: |
           CERT_INFO=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application")
           CERT_ID=$(echo "$CERT_INFO" | awk -F'"' '{print $2}')
@@ -128,7 +128,7 @@ jobs:
           echo "Certificate imported."
 
       - name: Setup Apple API Key
-        if: ${{ runner.os == 'macOS' }}
+        if: ${{ runner.os == 'macOS' && secrets.APPLE_API_KEY_PATH != '' }}
         run: |
           echo "${{ secrets.APPLE_API_KEY_PATH }}" > $RUNNER_TEMP/apple-api-key.p8
 
