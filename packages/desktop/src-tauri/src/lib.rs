@@ -435,7 +435,7 @@ pub fn run() {
 
     #[cfg(all(target_os = "macos", not(debug_assertions)))]
     let _ = std::process::Command::new("killall")
-        .arg("opencode-cli")
+        .arg("humancode-cli")
         .output();
 
     let mut builder = tauri::Builder::default()
@@ -622,7 +622,7 @@ async fn initialize(app: AppHandle) {
                                 let _ = child.kill();
 
                                 return Err(format!(
-                                    "Failed to spawn OpenCode Server ({err}). Logs:\n{}",
+                                    "Failed to spawn HumanCode Server ({err}). Logs:\n{}",
                                     get_logs()
                                 ));
                             }
