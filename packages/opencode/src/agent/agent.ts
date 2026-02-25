@@ -77,7 +77,7 @@ export namespace Agent {
     const result: Record<string, Info> = {
       debug: {
         name: "debug",
-        description: "Step-by-step coding with live debugger walkthroughs in VS Code",
+        description: "Step-by-step coding with live debugger walkthroughs",
         prompt: PROMPT_DEBUG,
         temperature: 0.2,
         color: "#E06C75",

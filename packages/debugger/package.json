@@ -1,0 +1,19 @@
+{
+  "name": "@opencode-ai/debugger",
+  "version": "1.2.6",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "bin": { "opencode-debugger": "./src/index.ts" },
+  "exports": { "./*": "./src/*.ts" },
+  "scripts": { "typecheck": "tsc --noEmit", "start": "bun run src/index.ts" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.25.2",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@tsconfig/bun": "catalog:",
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}

@@ -18,6 +18,7 @@ import { Installation } from "../installation"
 import { withTimeout } from "@/util/timeout"
 import { McpOAuthProvider } from "./oauth-provider"
 import { McpOAuthCallback } from "./oauth-callback"
+import path from "path"
 import { McpAuth } from "./auth"
 import { BusEvent } from "../bus/bus-event"
 import { Bus } from "@/bus"
@@ -160,10 +161,15 @@ export namespace MCP {
     return typeof entry === "object" && entry !== null && "type" in entry
   }
 
+  const DEBUGGER_ENTRY = path.resolve(
+    import.meta.dirname,
+    "../../../debugger/src/index.ts",
+  )
+
   const DEFAULT_MCP_SERVERS: Record<string, Config.Mcp> = {
     debugger: {
       type: "local",
-      command: ["npx", "-y", "debugger-mcp-server"],
+      command: ["bun", "run", DEBUGGER_ENTRY],
     },
   }
 
