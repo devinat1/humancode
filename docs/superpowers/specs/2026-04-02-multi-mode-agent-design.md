@@ -48,7 +48,7 @@ Multi-task manager. User queues tasks, agent works through them with self-review
 - **Agent name:** `vibe`
 - **Temperature:** 0.3
 - **Tools:** All standard tools. Task queue management is handled by the vibe agent itself (not a separate tool) — it maintains an internal task list and uses child sessions via the existing `task` tool to execute each task in isolation.
-- **Step limit:** 100 per task (configurable in `.humancode/standards.yml`)
+- **Step limit:** 100 per task (configurable via opencode agent config `steps` field)
 - **Behavior:**
   - Parses prompt into discrete tasks (asks for clarification if ambiguous)
   - Presents task list for confirmation before starting
@@ -70,20 +70,21 @@ Single prompt, fully autonomous, long-running. Iterates until quality standards 
 - **Agent name:** `claw`
 - **Temperature:** 0.2
 - **Tools:** All standard tools + self-review
-- **Step limit:** 500 (configurable in `.humancode/standards.yml`)
+- **Step limit:** 500 (configurable via opencode agent config `steps` field)
 - **Behavior:**
   - Accepts a single prompt describing the end goal
   - Plans implementation autonomously (uses `plan` agent internally)
   - Executes end-to-end: writes code, writes tests, runs tests
   - Self-review loop: generate diff, review against standards, fix violations, re-review (max 3 iterations), re-run tests
   - Presents final result with summary, diff, test results, review verdict
+  - If step limit (500) is exhausted before completion: stop, present partial results with a summary of what was completed and what remains. Worktree is preserved for manual continuation or a new Claw session.
 - **Autonomy:** All permissions set to `allow` by default (no prompts during run)
 - **Safety:**
-  - Creates a git worktree using the existing `Worktree` system (`packages/opencode/src/worktree/`). Branch naming: `humancode/claw/<session-slug>`. On completion, offers to merge into the original branch or create a PR.
+  - Creates a git worktree using the existing `Worktree` system (`packages/opencode/src/worktree/`). Branch naming: `opencode/claw/<session-slug>` (uses existing `opencode/` prefix convention). On completion, offers to merge into the original branch or create a PR.
   - If user is already on a non-main branch, the worktree branches from the current branch.
   - User can cancel with Ctrl+C. Worktree and changes remain for inspection. TUI reverts to normal message view showing a partial summary of work completed.
   - Dangerous operations (force push, file deletion outside project, env files) still require confirmation even in claw mode.
-  - Refuses to run without `.humancode/standards.yml`.
+  - Refuses to run without `.humancode/standards.yml` in interactive mode (TUI presents the first-run dialog to generate the file before Claw starts). In non-interactive mode, falls back to defaults per the First-Run Fallback rules.
 
 ## Complexity Assessor
 
@@ -127,16 +128,24 @@ Evaluated in priority order — first match wins:
 | 1 | Learning intent detected | Pair | User wants to understand, not ship |
 | 2 | Multiple distinct tasks (task_count >= 2) | Vibe | Multi-task queue is the right workflow |
 | 3 | Single task, complexity < 15 | Claw | Simple enough for full autonomy |
-| 4 | Single task, complexity 15-30 | Vibe | Moderate complexity benefits from self-review checkpoints |
+| 4 | Single task, 15 <= complexity <= 30 | Vibe | Moderate complexity benefits from self-review checkpoints |
 | 5 | Single task, complexity > 30 | Debug | High complexity needs human step-through |
 
 Note: Debug mode is reserved for genuinely complex, high-risk changes where step-by-step human verification is valuable. Moderate complexity routes to Vibe, not Debug.
 
 ### Confidence Score
 
+Confidence is based on how decisive the scoring is — how far the result is from the nearest decision boundary:
+
 ```
-confidence = (signals_agreeing_on_selected_mode / total_signals_evaluated) * 100
+margin = min(|complexity - 15|, |complexity - 30|)
+confidence = min(95, 50 + (margin * 3))
 ```
+
+Special cases:
+- Learning intent with no complexity signals: confidence = 90% (strong signal)
+- Multiple tasks detected: confidence = 85% (clear structural signal)
+- If the complexity score falls within 3 points of a boundary (12-18 or 27-33): confidence capped at 65%
 
 - **High confidence (>= 75%):** Auto-select and proceed. Display recommendation inline.
 - **Low confidence (< 75%):** Auto-select but flag uncertainty: "Recommending vibe mode, but this could also be a claw task. Confidence: 62%. Override with Tab."
@@ -178,10 +187,6 @@ custom:
   - "No console.log in production code"
 ```
 
-### First-Run Flow
-
-When no `.humancode/standards.yml` exists and user enters vibe or claw mode, present the catalog with checkboxes. Generate config on confirmation.
-
 ### Self-Review Sub-Agent
 
 - **Agent name:** `review`
@@ -198,7 +203,7 @@ When no `.humancode/standards.yml` exists and user enters vibe or claw mode, pre
     ]
   }
   ```
-- **Max iterations:** 3 per review cycle
+- **Max iterations:** 3 per review cycle. Both Vibe and Claw reference this same 3-iteration limit — the review sub-agent enforces it, not the parent agents.
 - **Standards stored as markdown** in `packages/opencode/src/agent/standards/` — one file per standard group (e.g., `clean.md`, `solid.md`, `bob.md`). Each file contains the full text of that standard's rules. The review agent's system prompt is composed by concatenating the enabled standard files based on `.humancode/standards.yml`.
 
 ### First-Run Fallback
