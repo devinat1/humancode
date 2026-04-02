@@ -575,7 +575,7 @@ test("defaultAgent returns pair when no default_agent config", async () => {
   })
 })
 
-test("defaultAgent respects default_agent config set to plan", async () => {
+test("defaultAgent throws when default_agent points to plan (now hidden)", async () => {
   await using tmp = await tmpdir({
     config: {
       default_agent: "plan",
@@ -584,8 +584,7 @@ test("defaultAgent respects default_agent config set to plan", async () => {
   await Instance.provide({
     directory: tmp.path,
     fn: async () => {
-      const agent = await Agent.defaultAgent()
-      expect(agent).toBe("plan")
+      await expect(Agent.defaultAgent()).rejects.toThrow('default agent "plan" is hidden')
     },
   })
 })

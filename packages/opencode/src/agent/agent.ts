@@ -167,6 +167,7 @@ export namespace Agent {
       build: {
         name: "build",
         description: "The default agent. Executes tools based on configured permissions.",
+        hidden: true,
         options: {},
         permission: PermissionNext.merge(
           defaults,
@@ -182,6 +183,7 @@ export namespace Agent {
       plan: {
         name: "plan",
         description: "Plan mode. Disallows all edit tools.",
+        hidden: true,
         options: {},
         permission: PermissionNext.merge(
           defaults,
@@ -364,12 +366,14 @@ export namespace Agent {
     return state().then((x) => x[agent])
   }
 
+  const MODE_ORDER: Record<string, number> = { pair: 0, debug: 1, vibe: 2, claw: 3 }
+
   export async function list() {
     const cfg = await Config.get()
     return pipe(
       await state(),
       values(),
-      sortBy([(x) => (cfg.default_agent ? x.name === cfg.default_agent : x.name === "debug"), "desc"]),
+      sortBy([(x) => MODE_ORDER[x.name] ?? 99, "asc"]),
     )
   }
 
