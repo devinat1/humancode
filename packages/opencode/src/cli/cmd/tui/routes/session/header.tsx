@@ -8,6 +8,7 @@ import type { AssistantMessage, Session } from "@opencode-ai/sdk/v2"
 import { useCommandDialog } from "@tui/component/dialog-command"
 import { useKeybind } from "../../context/keybind"
 import { useTerminalDimensions } from "@opentui/solid"
+import { useLocal } from "@tui/context/local"
 
 const Title = (props: { session: Accessor<Session> }) => {
   const { theme } = useTheme()
@@ -26,6 +27,16 @@ const ContextInfo = (props: { context: Accessor<string | undefined>; cost: Acces
         {props.context()} ({props.cost()})
       </text>
     </Show>
+  )
+}
+
+const ModeBadge = () => {
+  const local = useLocal()
+  const color = createMemo(() => local.agent.color(local.agent.current().name))
+  return (
+    <text fg={color()} style={{ bold: true }}>
+      [{local.agent.current().name.toUpperCase()}]
+    </text>
   )
 }
 
@@ -124,7 +135,10 @@ export function Header() {
           </Match>
           <Match when={true}>
             <box flexDirection={narrow() ? "column" : "row"} justifyContent="space-between" gap={1}>
-              <Title session={session} />
+              <box flexDirection="row" gap={1}>
+                <ModeBadge />
+                <Title session={session} />
+              </box>
               <ContextInfo context={context} cost={cost} />
             </box>
           </Match>
