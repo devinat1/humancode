@@ -32,6 +32,9 @@ import { useToast } from "../../ui/toast"
 import { useKV } from "../../context/kv"
 import { useTextareaKeybindings } from "../textarea-keybindings"
 import { DialogSkill } from "../dialog-skill"
+import { Assessor } from "@/agent/assessor"
+import { DialogStandards } from "../dialog-standards"
+import path from "path"
 
 export type PromptProps = {
   sessionID?: string
@@ -569,6 +572,26 @@ export function Prompt(props: PromptProps) {
     const currentMode = store.mode
     const variant = local.model.variant.current()
 
+    // Auto-select mode if user hasn't manually chosen
+    if (!local.agent.manuallySelected()) {
+      const result = Assessor.analyze(inputText)
+      local.agent.set(result.mode)
+      // Reset manual selection flag since this was auto-selected
+      local.agent.resetManualSelection()
+    }
+
+    // When entering vibe or claw mode, ensure standards are configured
+    const currentAgentName = local.agent.current().name
+    if (currentAgentName === "vibe" || currentAgentName === "claw") {
+      const directory = process.cwd()
+      const standardsFile = Bun.file(path.join(directory, ".humancode", "standards.yml"))
+      const hasStandards = await standardsFile.exists()
+      if (!hasStandards) {
+        dialog.replace(() => <DialogStandards directory={directory} />)
+        return
+      }
+    }
+
     if (store.mode === "shell") {
       sdk.client.session.shell({
         sessionID,
@@ -643,6 +666,8 @@ export function Prompt(props: PromptProps) {
       parts: [],
     })
     setStore("extmarkToPartIndex", new Map())
+    // Reset manual selection so next prompt can be auto-assessed
+    local.agent.resetManualSelection()
     props.onSubmit?.()
 
     // temporary hack to make sure the message is sent
@@ -1132,7 +1157,7 @@ export function Prompt(props: PromptProps) {
                     </text>
                   </Show>
                   <text fg={theme.text}>
-                    {keybind.print("agent_cycle")} <span style={{ fg: theme.textMuted }}>agents</span>
+                    {keybind.print("agent_cycle")} <span style={{ fg: theme.textMuted }}>mode</span>
                   </text>
                   <text fg={theme.text}>
                     {keybind.print("command_list")} <span style={{ fg: theme.textMuted }}>commands</span>

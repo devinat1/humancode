@@ -38,8 +38,10 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       const visibleAgents = createMemo(() => sync.data.agent.filter((x) => !x.hidden))
       const [agentStore, setAgentStore] = createStore<{
         current: string
+        manuallySelected: boolean
       }>({
         current: agents()[0].name,
+        manuallySelected: false,
       })
       const { theme } = useTheme()
       const colors = createMemo(() => [
@@ -66,6 +68,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
               duration: 3000,
             })
           setAgentStore("current", name)
+          setAgentStore("manuallySelected", true)
         },
         move(direction: 1 | -1) {
           batch(() => {
@@ -74,7 +77,19 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
             if (next >= agents().length) next = 0
             const value = agents()[next]
             setAgentStore("current", value.name)
+            setAgentStore("manuallySelected", true)
+            toast.show({
+              variant: "info",
+              message: `Switched to ${value.name.toUpperCase()} mode`,
+              duration: 2000,
+            })
           })
+        },
+        manuallySelected() {
+          return agentStore.manuallySelected
+        },
+        resetManualSelection() {
+          setAgentStore("manuallySelected", false)
         },
         color(name: string) {
           const index = visibleAgents().findIndex((x) => x.name === name)
