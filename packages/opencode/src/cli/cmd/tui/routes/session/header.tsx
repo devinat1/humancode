@@ -34,8 +34,8 @@ const ModeBadge = () => {
   const local = useLocal()
   const color = createMemo(() => local.agent.color(local.agent.current().name))
   return (
-    <text fg={color()} style={{ bold: true }}>
-      [{local.agent.current().name.toUpperCase()}]
+    <text fg={color()}>
+      <b>[{local.agent.current().name.toUpperCase()}]</b>
     </text>
   )
 }
