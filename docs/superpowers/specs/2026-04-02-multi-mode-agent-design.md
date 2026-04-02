@@ -2,7 +2,7 @@
 
 ## Overview
 
-Four automation levels for coding tasks, auto-selected by a complexity assessor, overridable with Tab. Built on opencode's existing agent registry — each mode is a registered agent with its own system prompt, tool permissions, and behavior.
+Five automation levels for coding tasks, auto-selected by a complexity assessor, overridable with Tab. Built on opencode's existing agent registry — each mode is a registered agent with its own system prompt, tool permissions, and behavior.
 
 ### Relationship to Existing Agents
 
@@ -86,6 +86,53 @@ Single prompt, fully autonomous, long-running. Iterates until quality standards 
   - Dangerous operations (force push, file deletion outside project, env files) still require confirmation even in claw mode.
   - Refuses to run without `.humancode/standards.yml` in interactive mode (TUI presents the first-run dialog to generate the file before Claw starts). In non-interactive mode, falls back to defaults per the First-Run Fallback rules.
 
+### Adaptive Mode
+
+Dynamically transitions between modes within a single session based on per-step analysis and explicit triggers. Plans first, then picks the right mode for each phase of work.
+
+- **Agent name:** `adaptive`
+- **Temperature:** 0.3
+- **Tools:** All standard tools (full permissions — transitions to restricted modes by switching agent mid-session)
+- **Step limit:** 500 (configurable via opencode agent config `steps` field)
+- **Color:** Orange (#D19A66)
+- **Behavior:**
+  1. Receive prompt → plan the task into discrete steps
+  2. Evaluate first step's complexity → start in that mode (pair/debug/vibe/claw)
+  3. After each step, run per-step analysis and check triggers
+  4. If transition warranted → ask user permission with reason
+  5. User confirms (Y/Enter) or overrides with Tab
+
+**Per-step analysis (evaluated after every tool call or code change):**
+- Track cumulative files touched and cross-package spread
+- Compare current step complexity to the mode it's running in
+- If mismatch persists for 2+ consecutive steps, suggest transition
+
+**Escalation triggers (→ more human involvement):**
+
+| Trigger | Suggested Mode | Message |
+|---------|---------------|---------|
+| 2+ consecutive test failures | Debug | "2 test failures in a row. Switch to Debug to step through?" |
+| Touching files without test coverage | Debug | "Modifying untested code. Switch to Debug for careful review?" |
+| Cross-package changes detected mid-task | Debug | "This now touches 3 packages. Switch to Debug?" |
+| User asks explanatory question ("why", "how does") | Pair | "Looks like you want to understand this. Switch to Pair?" |
+
+**De-escalation triggers (→ less human involvement):**
+
+| Trigger | Suggested Mode | Message |
+|---------|---------------|---------|
+| 3+ steps completed successfully | Claw | "3 steps clean. Switch to Claw to finish autonomously?" |
+| Remaining steps similar to completed ones | Claw | "Remaining work is similar to what's done. Switch to Claw?" |
+| User says "just do it" / "finish this" | Claw | Immediate switch, no confirmation needed |
+
+**Transition mechanics:**
+- All transitions ask permission except explicit user commands ("just do it")
+- Transition prompt: "This refactor touches 5 files with no tests. Switch to Debug? [Y/Tab to override]"
+- On confirmation, the agent switches by changing the active agent mid-session (same mechanism as Tab cycling)
+- The adaptive agent remains the "orchestrator" — it delegates to the active mode's behavior but keeps monitoring
+- Mode badge updates to show the current active sub-mode: `[ADAPTIVE:DEBUG]`
+
+**Adaptive is the default** when the assessor's confidence is below 75%, providing intelligent mode management instead of a potentially wrong fixed choice.
+
 ## Complexity Assessor
 
 A heuristic function in `packages/opencode/src/agent/assessor.ts`. No LLM call — runs instantly.
@@ -148,7 +195,7 @@ Special cases:
 - If the complexity score falls within 3 points of a boundary (12-18 or 27-33): confidence capped at 65%
 
 - **High confidence (>= 75%):** Auto-select and proceed. Display recommendation inline.
-- **Low confidence (< 75%):** Auto-select but flag uncertainty: "Recommending vibe mode, but this could also be a claw task. Confidence: 62%. Override with Tab."
+- **Low confidence (< 75%):** Select adaptive mode. It will plan the task and pick the right starting mode dynamically.
 
 ### Output
 
@@ -236,10 +283,11 @@ Status bar badge with distinct color per mode:
 | Debug | `DEBUG` | Salmon (#E06C75, existing) |
 | Vibe | `VIBE` | Green (#98C379) |
 | Claw | `CLAW` | Purple (#C678DD) |
+| Adaptive | `ADAPTIVE` | Orange (#D19A66) — shows `ADAPTIVE:DEBUG` etc. when in a sub-mode |
 
 ### Tab Cycling
 
-Pair -> Debug -> Vibe -> Claw -> Pair. Toast on switch: "Switched to VIBE mode". Mode switch mid-session changes system prompt and tool permissions for the next message.
+Pair -> Debug -> Vibe -> Claw -> Adaptive -> Pair. Toast on switch: "Switched to VIBE mode". Mode switch mid-session changes system prompt and tool permissions for the next message.
 
 ### Auto-Selection Flow
 
