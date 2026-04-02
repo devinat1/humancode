@@ -1,6 +1,6 @@
 export namespace Assessor {
   export type Result = {
-    mode: "pair" | "debug" | "vibe" | "claw"
+    mode: "pair" | "debug" | "vibe" | "claw" | "adaptive"
     confidence: number
     reason: string
     complexity: number
@@ -59,50 +59,57 @@ export namespace Assessor {
   }
 
   export function analyze(prompt: string): Result {
-    if (hasLearningIntent(prompt)) {
-      return {
-        mode: "pair",
-        confidence: 90,
-        reason: "Learning intent detected in prompt",
-        complexity: complexity(prompt),
+    const result = ((): Result => {
+      if (hasLearningIntent(prompt)) {
+        return {
+          mode: "pair",
+          confidence: 90,
+          reason: "Learning intent detected in prompt",
+          complexity: complexity(prompt),
+        }
       }
-    }
 
-    if (taskCount(prompt) >= 2) {
-      return {
-        mode: "vibe",
-        confidence: 85,
-        reason: "Multiple distinct tasks detected",
-        complexity: complexity(prompt),
+      if (taskCount(prompt) >= 2) {
+        return {
+          mode: "vibe",
+          confidence: 85,
+          reason: "Multiple distinct tasks detected",
+          complexity: complexity(prompt),
+        }
       }
-    }
 
-    const c = complexity(prompt)
-    const confidence = complexityConfidence(c)
+      const c = complexity(prompt)
+      const confidence = complexityConfidence(c)
 
-    if (c < 15) {
+      if (c < 15) {
+        return {
+          mode: "claw",
+          confidence,
+          reason: `Low complexity score (${c})`,
+          complexity: c,
+        }
+      }
+
+      if (c <= 30) {
+        return {
+          mode: "vibe",
+          confidence,
+          reason: `Medium complexity score (${c})`,
+          complexity: c,
+        }
+      }
+
       return {
-        mode: "claw",
+        mode: "debug",
         confidence,
-        reason: `Low complexity score (${c})`,
+        reason: `High complexity score (${c})`,
         complexity: c,
       }
-    }
+    })()
 
-    if (c <= 30) {
-      return {
-        mode: "vibe",
-        confidence,
-        reason: `Medium complexity score (${c})`,
-        complexity: c,
-      }
+    if (result.confidence < 75) {
+      return { mode: "adaptive", confidence: result.confidence, reason: `Low confidence (${result.confidence}%) — using adaptive mode to dynamically select`, complexity: result.complexity }
     }
-
-    return {
-      mode: "debug",
-      confidence,
-      reason: `High complexity score (${c})`,
-      complexity: c,
-    }
+    return result
   }
 }

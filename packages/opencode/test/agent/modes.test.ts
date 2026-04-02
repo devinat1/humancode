@@ -6,7 +6,7 @@ import { Assessor } from "../../src/agent/assessor"
 import { Standards } from "../../src/agent/standards"
 
 describe("multi-mode system", () => {
-  test("all four modes are registered as primary agents", async () => {
+  test("all five modes are registered as primary agents", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
       directory: tmp.path,
@@ -18,6 +18,7 @@ describe("multi-mode system", () => {
         expect(names).toContain("debug")
         expect(names).toContain("vibe")
         expect(names).toContain("claw")
+        expect(names).toContain("adaptive")
         expect(names).not.toContain("build")
         expect(names).not.toContain("plan")
       },
@@ -93,6 +94,33 @@ describe("multi-mode system", () => {
         const colors = [pair?.color, debug?.color, vibe?.color, claw?.color]
         const unique = new Set(colors)
         expect(unique.size).toBe(4)
+      },
+    })
+  })
+
+  test("adaptive agent is registered as primary", async () => {
+    await using tmp = await tmpdir({ config: {} })
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const agent = await Agent.get("adaptive")
+        expect(agent).toBeDefined()
+        expect(agent!.mode).toBe("primary")
+        expect(agent!.steps).toBe(500)
+        expect(agent!.color).toBe("#D19A66")
+      },
+    })
+  })
+
+  test("Tab cycle includes adaptive after claw", async () => {
+    await using tmp = await tmpdir({ config: {} })
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const agents = await Agent.list()
+        const visible = agents.filter((a) => a.mode !== "subagent" && !a.hidden)
+        const names = visible.map((a) => a.name)
+        expect(names.indexOf("adaptive")).toBe(names.indexOf("claw") + 1)
       },
     })
   })

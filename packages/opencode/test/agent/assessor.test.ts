@@ -32,16 +32,9 @@ describe("Assessor", () => {
 
   test("high complexity returns debug mode", () => {
     // scope=10 (refactor), no file refs => +5, complexity=15 is vibe boundary
-    // Need complexity > 30: use a prompt with no file refs (+5) and highest scope (10)
-    // but 10+5=15, still vibe. Complexity > 30 is not reachable with current scoring.
-    // Max is 10 (refactor) + 5 (no refs) = 15, or 10 - 2*N refs.
-    // The spec says complexity > 30 => debug, but max achievable is 15 with refactor + no refs.
-    // So let's test the boundary: complexity > 30 can't be produced by the spec's own formula.
-    // Instead verify that refactor with no refs (complexity=15) is NOT debug (it's vibe, the boundary).
-    // And verify high-scope + no refs gives debug only if complexity > 30.
-    // Since that's impossible per the spec, test that refactor+no refs gives vibe (complexity=15).
+    // complexity=15 produces confidence=50 which is < 75, so routes to adaptive
     const result = Assessor.analyze("refactor the entire authentication system with no file references")
-    expect(result.mode).toBe("vibe")
+    expect(result.mode).toBe("adaptive")
     expect(result.complexity).toBe(15)
   })
 
@@ -70,13 +63,19 @@ describe("Assessor", () => {
     expect(typeof result.complexity).toBe("number")
   })
 
-  test("mid complexity (15-30) returns vibe mode", () => {
-    // "add" = 5, no file refs = +5 => complexity=10, not in range
-    // "implement" = 5, no refs = +5 => 10
-    // "add" with no refs needs to be 15-30
-    // Try: "add implement create refactor" ... actually let's craft carefully:
-    // scope=10 (refactor), specificity: no refs = +5 => complexity=15 => vibe
+  test("mid complexity (15-30) routes to adaptive due to low confidence at boundary", () => {
+    // scope=10 (refactor), specificity: no refs = +5 => complexity=15
+    // complexityConfidence(15) = 50 which is < 75, so routes to adaptive
     const result = Assessor.analyze("refactor the login handler with no specific files")
-    expect(result.mode).toBe("vibe")
+    expect(result.mode).toBe("adaptive")
+  })
+
+  test("low confidence routes to adaptive", () => {
+    // A prompt that lands near a boundary (complexity ~15) should have low confidence
+    const result = Assessor.analyze("add some validation")
+    // If confidence < 75, should be adaptive
+    if (result.confidence < 75) {
+      expect(result.mode).toBe("adaptive")
+    }
   })
 })

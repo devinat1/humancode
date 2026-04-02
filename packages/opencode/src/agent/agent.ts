@@ -9,6 +9,7 @@ import { Auth } from "../auth"
 import { ProviderTransform } from "../provider/transform"
 
 import PROMPT_GENERATE from "./generate.txt"
+import PROMPT_ADAPTIVE from "./prompt/adaptive.txt"
 import PROMPT_CLAW from "./prompt/claw.txt"
 import PROMPT_COMPACTION from "./prompt/compaction.txt"
 import PROMPT_DEBUG from "./prompt/debug.txt"
@@ -150,6 +151,32 @@ export namespace Agent {
         prompt: PROMPT_CLAW,
         temperature: 0.2,
         color: "#C678DD",
+        steps: 500,
+        permission: PermissionNext.merge(
+          defaults,
+          PermissionNext.fromConfig({
+            "*": "allow",
+            question: "allow",
+            plan_enter: "allow",
+            read: {
+              "*": "allow",
+              "*.env": "ask",
+              "*.env.*": "ask",
+              "*.env.example": "allow",
+            },
+          }),
+          user,
+        ),
+        options: {},
+        mode: "primary",
+        native: true,
+      },
+      adaptive: {
+        name: "adaptive",
+        description: "Adaptive agent that transitions between modes based on task complexity and outcomes.",
+        prompt: PROMPT_ADAPTIVE,
+        temperature: 0.3,
+        color: "#D19A66",
         steps: 500,
         permission: PermissionNext.merge(
           defaults,
@@ -372,7 +399,7 @@ export namespace Agent {
     return state().then((x) => x[agent])
   }
 
-  const MODE_ORDER: Record<string, number> = { pair: 0, debug: 1, vibe: 2, claw: 3 }
+  const MODE_ORDER: Record<string, number> = { pair: 0, debug: 1, vibe: 2, claw: 3, adaptive: 4 }
 
   export async function list() {
     const cfg = await Config.get()

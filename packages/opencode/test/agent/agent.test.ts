@@ -677,6 +677,7 @@ test("defaultAgent throws when all primary agents are disabled", async () => {
         debug: { disable: true },
         vibe: { disable: true },
         claw: { disable: true },
+        adaptive: { disable: true },
         build: { disable: true },
         plan: { disable: true },
       },
