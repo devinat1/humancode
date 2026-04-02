@@ -4,6 +4,16 @@
 
 Four automation levels for coding tasks, auto-selected by a complexity assessor, overridable with Tab. Built on opencode's existing agent registry — each mode is a registered agent with its own system prompt, tool permissions, and behavior.
 
+### Relationship to Existing Agents
+
+The four modes **replace** the existing `build` and `plan` primary agents:
+
+- `build` is replaced by `vibe` (multi-task) and `claw` (autonomous) which cover its use cases with added self-review
+- `plan` is absorbed into `pair` (read-only analysis and guidance) and used internally by `claw` for planning phases
+- `debug` remains unchanged
+- `build` and `plan` are removed from the Tab cycle but remain available via explicit agent selection in the command palette for backwards compatibility
+- Sub-agents (`general`, `explore`, `compaction`, `title`, `summary`) are unchanged
+
 ## Modes
 
 ### Pair Mode
@@ -12,7 +22,7 @@ Pair programming partner. Suggests approaches and explains trade-offs. Never wri
 
 - **Agent name:** `pair`
 - **Temperature:** 0.4
-- **Tools:** Read-only — `read`, `grep`, `glob`, `ls`, `websearch`, `webfetch`, `codesearch`
+- **Tools:** Read-only — `read`, `grep`, `glob`, `ls`, `websearch`, `webfetch` (network tools included since they gather information without modifying the project)
 - **Behavior:**
   - Analyzes codebase and breaks tasks into steps
   - Explains what needs to change, where, and why
@@ -37,8 +47,8 @@ Multi-task manager. User queues tasks, agent works through them with self-review
 
 - **Agent name:** `vibe`
 - **Temperature:** 0.3
-- **Tools:** All standard tools + task management
-- **Step limit:** 100+ per task
+- **Tools:** All standard tools. Task queue management is handled by the vibe agent itself (not a separate tool) — it maintains an internal task list and uses child sessions via the existing `task` tool to execute each task in isolation.
+- **Step limit:** 100 per task (configurable in `.humancode/standards.yml`)
 - **Behavior:**
   - Parses prompt into discrete tasks (asks for clarification if ambiguous)
   - Presents task list for confirmation before starting
@@ -48,8 +58,10 @@ Multi-task manager. User queues tasks, agent works through them with self-review
   - Presents per-task summary with diffs when all tasks complete
 - **Task queue:**
   - One parent session, child sessions per task (uses existing parent/child support)
-  - User can add, reorder, or cancel pending tasks while agent works
+  - User can add tasks via the prompt input while agent works (appended to queue)
+  - User can cancel pending tasks via keyboard shortcut (Ctrl+D on selected task in queue panel)
   - User can accept, reject, or request changes on individual tasks at the end
+- **Error recovery:** If a task fails (crash, model error, unrecoverable), mark it as failed with error context, skip to the next task, and include the failure in the end-of-run summary. User can re-queue failed tasks.
 
 ### Claw Mode
 
@@ -58,7 +70,7 @@ Single prompt, fully autonomous, long-running. Iterates until quality standards 
 - **Agent name:** `claw`
 - **Temperature:** 0.2
 - **Tools:** All standard tools + self-review
-- **Step limit:** 500+
+- **Step limit:** 500 (configurable in `.humancode/standards.yml`)
 - **Behavior:**
   - Accepts a single prompt describing the end goal
   - Plans implementation autonomously (uses `plan` agent internally)
@@ -67,10 +79,11 @@ Single prompt, fully autonomous, long-running. Iterates until quality standards 
   - Presents final result with summary, diff, test results, review verdict
 - **Autonomy:** All permissions set to `allow` by default (no prompts during run)
 - **Safety:**
-  - Operates on a git branch, never directly on main
-  - User can cancel with Ctrl+C, changes remain in working tree
-  - Dangerous operations (force push, file deletion outside project, env files) still require confirmation
-  - Refuses to run without `.humancode/standards.yml`
+  - Creates a git worktree using the existing `Worktree` system (`packages/opencode/src/worktree/`). Branch naming: `humancode/claw/<session-slug>`. On completion, offers to merge into the original branch or create a PR.
+  - If user is already on a non-main branch, the worktree branches from the current branch.
+  - User can cancel with Ctrl+C. Worktree and changes remain for inspection. TUI reverts to normal message view showing a partial summary of work completed.
+  - Dangerous operations (force push, file deletion outside project, env files) still require confirmation even in claw mode.
+  - Refuses to run without `.humancode/standards.yml`.
 
 ## Complexity Assessor
 
@@ -78,44 +91,61 @@ A heuristic function in `packages/opencode/src/agent/assessor.ts`. No LLM call �
 
 ### Prompt Signals
 
-| Signal | Measurement |
-|--------|-------------|
-| Task count | Split on conjunctions, bullets, numbered lists, semicolons |
-| Scope keywords | Keyword-to-weight map: "fix typo" low, "refactor" high, "build" high, "rename" low |
-| Learning intent | "explain", "understand", "walk me through", "why does", "how does" |
-| Specificity | References to specific files/functions lower complexity; vague descriptions raise it |
+| Signal | Measurement | Value |
+|--------|-------------|-------|
+| Task count | Split on conjunctions, bullets, numbered lists, semicolons | Count of distinct tasks |
+| Scope keywords | Keyword weight: "fix typo/rename/update" = 2, "add/implement" = 5, "refactor/redesign/build from scratch" = 10 | Highest matching weight |
+| Learning intent | "explain", "understand", "walk me through", "why does", "how does" | Boolean flag |
+| Specificity | Each specific file/function reference = -2 (lowers complexity); no specifics = +5 | Sum |
 
 ### Codebase Signals
 
-| Signal | Measurement |
-|--------|-------------|
-| Files touched | Grep for identifiers/paths in prompt, count matches |
-| File complexity | Line count of matched files |
-| Cross-package spread | Distinct packages under `packages/` touched |
-| Test coverage | Existence of `.test.ts` or `__tests__/` for touched files |
+| Signal | Measurement | Value |
+|--------|-------------|-------|
+| Files touched | Grep for identifiers/paths in prompt, count matching files | Count |
+| File complexity | Average line count of matched files / 100 (capped at 5) | 0-5 |
+| Cross-package spread | Distinct packages under `packages/` touched | Count |
+| Untested files | Count of matched files without corresponding `.test.ts` or `__tests__/` | Count |
 
 ### Scoring
 
 ```
-complexity = prompt_complexity_weight + (files_touched * 2) + (packages_spread * 5) + (no_tests * 3)
+complexity = scope_keyword_weight
+           + specificity_adjustment
+           + (files_touched * 2)
+           + (packages_spread * 5)
+           + (untested_files * 3)
+           + file_complexity
 ```
 
 ### Decision Matrix
 
-| Condition | Mode |
-|-----------|------|
-| Learning intent detected | Pair |
-| Multiple distinct tasks | Vibe |
-| complexity < 15, single task | Claw |
-| complexity >= 15, single task | Debug |
+Evaluated in priority order — first match wins:
+
+| Priority | Condition | Mode | Rationale |
+|----------|-----------|------|-----------|
+| 1 | Learning intent detected | Pair | User wants to understand, not ship |
+| 2 | Multiple distinct tasks (task_count >= 2) | Vibe | Multi-task queue is the right workflow |
+| 3 | Single task, complexity < 15 | Claw | Simple enough for full autonomy |
+| 4 | Single task, complexity 15-30 | Vibe | Moderate complexity benefits from self-review checkpoints |
+| 5 | Single task, complexity > 30 | Debug | High complexity needs human step-through |
+
+Note: Debug mode is reserved for genuinely complex, high-risk changes where step-by-step human verification is valuable. Moderate complexity routes to Vibe, not Debug.
+
+### Confidence Score
+
+```
+confidence = (signals_agreeing_on_selected_mode / total_signals_evaluated) * 100
+```
+
+- **High confidence (>= 75%):** Auto-select and proceed. Display recommendation inline.
+- **Low confidence (< 75%):** Auto-select but flag uncertainty: "Recommending vibe mode, but this could also be a claw task. Confidence: 62%. Override with Tab."
 
 ### Output
 
 ```
 Recommending claw mode — single file change, tests exist. Confidence: 91%. Override with Tab.
 ```
-
-Confidence based on signal agreement. Low confidence when prompt is ambiguous.
 
 ## Quality Standards System
 
@@ -156,10 +186,38 @@ When no `.humancode/standards.yml` exists and user enters vibe or claw mode, pre
 
 - **Agent name:** `review`
 - **Mode:** `subagent` (hidden, internal)
+- **Temperature:** 0.1 (deterministic, consistent reviews)
+- **Tools:** Read-only — `read`, `grep`, `glob`, `ls` (needs to read files referenced in diffs for context)
 - **Input:** Diff of changes + enabled standards (full text in system prompt) + project context (AGENTS.md, lint configs)
-- **Output:** Structured verdict — `pass` or `fail` with violations list (file, line, standard key, explanation)
+- **Output:** Structured JSON verdict:
+  ```json
+  {
+    "verdict": "pass" | "fail",
+    "violations": [
+      { "file": "src/foo.ts", "line": 42, "standard": "clean", "rule": "naming", "explanation": "..." }
+    ]
+  }
+  ```
 - **Max iterations:** 3 per review cycle
-- **Standards stored as markdown** in `packages/opencode/src/agent/standards/` — one file per group, concatenated into review prompt based on config
+- **Standards stored as markdown** in `packages/opencode/src/agent/standards/` — one file per standard group (e.g., `clean.md`, `solid.md`, `bob.md`). Each file contains the full text of that standard's rules. The review agent's system prompt is composed by concatenating the enabled standard files based on `.humancode/standards.yml`.
+
+### First-Run Fallback
+
+When no `.humancode/standards.yml` exists:
+
+- **Interactive (TUI):** Present standards catalog dialog with checkboxes. Generate config on confirmation.
+- **Non-interactive (CI, API, headless):** Use default config with `clean` and `solid` enabled. Log a warning: "Using default standards. Create .humancode/standards.yml to customize."
+- **Malformed config:** Warn and fall back to defaults. Do not block execution.
+
+### Mode Persistence
+
+The selected mode is stored on the session record. When reopening a session, it resumes in the same mode. New sessions start with auto-selection. The `session` table gains a `mode` column (text, nullable — null means auto-select).
+
+### Mid-Session Switching
+
+- **Pair/Debug:** Switch takes effect on the next message. No interruption.
+- **Vibe (in progress):** Switching away pauses the task queue. Pending tasks remain. Switching back resumes.
+- **Claw (in progress):** Switching away cancels the autonomous run. Work completed so far remains in the worktree. A summary of progress is shown. The user can switch back to Claw to resume (new prompt picks up where it left off via the worktree state).
 
 ## TUI Integration
 
@@ -169,10 +227,10 @@ Status bar badge with distinct color per mode:
 
 | Mode | Label | Color |
 |------|-------|-------|
-| Pair | `PAIR` | Blue |
-| Debug | `DEBUG` | Yellow |
-| Vibe | `VIBE` | Green |
-| Claw | `CLAW` | Red |
+| Pair | `PAIR` | Blue (#61AFEF) |
+| Debug | `DEBUG` | Salmon (#E06C75, existing) |
+| Vibe | `VIBE` | Green (#98C379) |
+| Claw | `CLAW` | Purple (#C678DD) |
 
 ### Tab Cycling
 
