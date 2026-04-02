@@ -157,6 +157,12 @@ export namespace Agent {
             "*": "allow",
             question: "allow",
             plan_enter: "allow",
+            read: {
+              "*": "allow",
+              "*.env": "ask",
+              "*.env.*": "ask",
+              "*.env.example": "allow",
+            },
           }),
           user,
         ),
