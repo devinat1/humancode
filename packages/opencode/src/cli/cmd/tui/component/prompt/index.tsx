@@ -33,6 +33,8 @@ import { useKV } from "../../context/kv"
 import { useTextareaKeybindings } from "../textarea-keybindings"
 import { DialogSkill } from "../dialog-skill"
 import { Assessor } from "@/agent/assessor"
+import { DialogStandards } from "../dialog-standards"
+import path from "path"
 
 export type PromptProps = {
   sessionID?: string
@@ -576,6 +578,18 @@ export function Prompt(props: PromptProps) {
       local.agent.set(result.mode)
       // Reset manual selection flag since this was auto-selected
       local.agent.resetManualSelection()
+    }
+
+    // When entering vibe or claw mode, ensure standards are configured
+    const currentAgentName = local.agent.current().name
+    if (currentAgentName === "vibe" || currentAgentName === "claw") {
+      const directory = process.cwd()
+      const standardsFile = Bun.file(path.join(directory, ".humancode", "standards.yml"))
+      const hasStandards = await standardsFile.exists()
+      if (!hasStandards) {
+        dialog.replace(() => <DialogStandards directory={directory} />)
+        return
+      }
     }
 
     if (store.mode === "shell") {

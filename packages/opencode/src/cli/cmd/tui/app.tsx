@@ -19,6 +19,7 @@ import { DialogThemeList } from "@tui/component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
 import { CommandProvider, useCommandDialog } from "@tui/component/dialog-command"
 import { DialogAgent } from "@tui/component/dialog-agent"
+import { DialogStandards } from "@tui/component/dialog-standards"
 import { DialogSessionList } from "@tui/component/dialog-session-list"
 import { KeybindProvider } from "@tui/context/keybind"
 import { ThemeProvider, useTheme } from "@tui/context/theme"
@@ -38,6 +39,7 @@ import { ArgsProvider, useArgs, type Args } from "./context/args"
 import open from "open"
 import { writeHeapSnapshot } from "v8"
 import { PromptRefProvider, usePromptRef } from "./context/prompt"
+
 
 async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
   // can't set raw mode if not a TTY
@@ -463,6 +465,17 @@ function App() {
       },
       onSelect: () => {
         dialog.replace(() => <DialogMcp />)
+      },
+    },
+    {
+      title: "Quality standards",
+      value: "standards.check",
+      category: "Agent",
+      slash: {
+        name: "standards",
+      },
+      onSelect: () => {
+        dialog.replace(() => <DialogStandards directory={process.cwd()} />)
       },
     },
     {
