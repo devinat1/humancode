@@ -3,12 +3,15 @@ import { dlopen, ptr } from "bun:ffi"
 const STD_INPUT_HANDLE = -10
 const ENABLE_PROCESSED_INPUT = 0x0001
 
+const FILE_TYPE_CHAR = 0x0002
+
 const kernel = () =>
   dlopen("kernel32.dll", {
     GetStdHandle: { args: ["i32"], returns: "ptr" },
     GetConsoleMode: { args: ["ptr", "ptr"], returns: "i32" },
     SetConsoleMode: { args: ["ptr", "u32"], returns: "i32" },
     FlushConsoleInputBuffer: { args: ["ptr"], returns: "i32" },
+    GetFileType: { args: ["ptr"], returns: "u32" },
   })
 
 let k32: ReturnType<typeof kernel> | undefined
@@ -126,4 +129,30 @@ export function win32InstallCtrlCGuard() {
   }
 
   return unhook
+}
+
+/**
+ * Fix process.stdin.isTTY on Windows.
+ *
+ * Bun compiled binaries launched via Node.js spawnSync can report
+ * process.stdin.isTTY as false even when stdin is a console handle.
+ * This causes code guarded by `!process.stdin.isTTY` (e.g. reading
+ * piped input via Bun.stdin.text()) to block forever on a terminal.
+ *
+ * Uses kernel32 GetFileType to check if stdin is FILE_TYPE_CHAR (console).
+ * If so, patches process.stdin.isTTY to true.
+ */
+export function win32FixStdinIsTTY() {
+  if (process.platform !== "win32") return
+  if (process.stdin.isTTY) return
+  if (!load()) return
+
+  const handle = k32!.symbols.GetStdHandle(STD_INPUT_HANDLE)
+  if (k32!.symbols.GetFileType(handle) === FILE_TYPE_CHAR) {
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: true,
+      writable: true,
+      configurable: true,
+    })
+  }
 }

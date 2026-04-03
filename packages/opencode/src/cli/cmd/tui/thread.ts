@@ -11,7 +11,7 @@ import { withNetworkOptions, resolveNetworkOptions } from "@/cli/network"
 import { Filesystem } from "@/util/filesystem"
 import type { Event } from "@opencode-ai/sdk/v2"
 import type { EventSource } from "./context/sdk"
-import { win32DisableProcessedInput, win32InstallCtrlCGuard } from "./win32"
+import { win32DisableProcessedInput, win32FixStdinIsTTY, win32InstallCtrlCGuard } from "./win32"
 
 declare global {
   const OPENCODE_WORKER_PATH: string
@@ -80,6 +80,10 @@ export const TuiThreadCommand = cmd({
         describe: "agent to use",
       }),
   handler: async (args) => {
+    // Fix isTTY detection before any code checks it — Bun compiled binaries
+    // launched via Node.js spawnSync can report false for console handles.
+    win32FixStdinIsTTY()
+
     // Keep ENABLE_PROCESSED_INPUT cleared even if other code flips it.
     // (Important when running under `bun run` wrappers on Windows.)
     const unguard = win32InstallCtrlCGuard()
