@@ -140,7 +140,8 @@ export function win32InstallCtrlCGuard() {
  * piped input via Bun.stdin.text()) to block forever on a terminal.
  *
  * Uses kernel32 GetFileType to check if stdin is FILE_TYPE_CHAR (console).
- * If so, patches process.stdin.isTTY to true.
+ * If so, patches process.stdin.isTTY to true and polyfills setRawMode
+ * via SetConsoleMode when the runtime didn't provide one.
  */
 export function win32FixStdinIsTTY() {
   if (process.platform !== "win32") return
@@ -148,11 +149,34 @@ export function win32FixStdinIsTTY() {
   if (!load()) return
 
   const handle = k32!.symbols.GetStdHandle(STD_INPUT_HANDLE)
-  if (k32!.symbols.GetFileType(handle) === FILE_TYPE_CHAR) {
-    Object.defineProperty(process.stdin, "isTTY", {
-      value: true,
-      writable: true,
-      configurable: true,
-    })
+  if (k32!.symbols.GetFileType(handle) !== FILE_TYPE_CHAR) return
+
+  Object.defineProperty(process.stdin, "isTTY", {
+    value: true,
+    writable: true,
+    configurable: true,
+  })
+
+  // When Bun doesn't detect a TTY it won't attach setRawMode.
+  // Polyfill it via kernel32 SetConsoleMode so the TUI can function.
+  const stdin = process.stdin as any
+  if (typeof stdin.setRawMode === "function") return
+
+  const buf = new Uint32Array(1)
+  if (k32!.symbols.GetConsoleMode(handle, ptr(buf)) === 0) return
+  const originalMode = buf[0]!
+
+  // ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT
+  const COOKED_FLAGS = 0x0007
+  // ENABLE_VIRTUAL_TERMINAL_INPUT — needed for ANSI escape sequences
+  const ENABLE_VT_INPUT = 0x0200
+
+  stdin.setRawMode = (mode: boolean) => {
+    if (mode) {
+      k32!.symbols.SetConsoleMode(handle, (originalMode & ~COOKED_FLAGS) | ENABLE_VT_INPUT)
+    } else {
+      k32!.symbols.SetConsoleMode(handle, originalMode)
+    }
+    return stdin
   }
 }

@@ -114,14 +114,22 @@ export function tui(input: {
 }) {
   // promise to prevent immediate exit
   return new Promise<void>(async (resolve) => {
-    const unguard = win32InstallCtrlCGuard()
-    win32DisableProcessedInput()
+    let unguard: (() => void) | undefined
+    try {
+      unguard = win32InstallCtrlCGuard()
+      win32DisableProcessedInput()
+    } catch {}
 
-    const mode = await getTerminalBackgroundColor()
+    let mode: "dark" | "light" = "dark"
+    try {
+      mode = await getTerminalBackgroundColor()
+    } catch {}
 
     // Re-clear after getTerminalBackgroundColor() — setRawMode(false) restores
     // the original console mode which re-enables ENABLE_PROCESSED_INPUT.
-    win32DisableProcessedInput()
+    try {
+      win32DisableProcessedInput()
+    } catch {}
 
     const onExit = async () => {
       unguard?.()
@@ -129,6 +137,7 @@ export function tui(input: {
       resolve()
     }
 
+    try {
     render(
       () => {
         return (
@@ -194,6 +203,12 @@ export function tui(input: {
         },
       },
     )
+    } catch (e) {
+      process.stderr.write(
+        `Failed to start TUI: ${e instanceof Error ? e.message : String(e)}\n`,
+      )
+      resolve()
+    }
   })
 }
 
