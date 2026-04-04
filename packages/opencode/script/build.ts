@@ -240,7 +240,11 @@ if (Script.release) {
     console.log("Built Windows installer: HumanCode-Setup-x64.exe")
   }
 
-  await $`gh release upload v${Script.version} ./dist/*.zip ./dist/*.tar.gz ./dist/HumanCode-Setup-*.exe --clobber`
+  const uploadGlobs = ["./dist/*.zip", "./dist/*.tar.gz"]
+  if (fs.existsSync("dist/HumanCode-Setup-x64.exe")) {
+    uploadGlobs.push("./dist/HumanCode-Setup-x64.exe")
+  }
+  await $`gh release upload v${Script.version} ${uploadGlobs.join(" ")} --clobber`
 }
 
 export { binaries }
