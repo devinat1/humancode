@@ -93,6 +93,17 @@ export namespace Installation {
       },
     ]
 
+    // On Windows, infer the installation method from the executable path
+    // instead of spawning subprocesses. Commands like `npm list -g` can
+    // block the event loop indefinitely on Windows, hanging the entire app.
+    if (process.platform === "win32") {
+      // Check pnpm/choco before npm/cho since the longer names contain the shorter ones.
+      for (const name of ["pnpm", "scoop", "choco", "yarn", "bun", "npm"] as const) {
+        if (exec.includes(name)) return name
+      }
+      return "unknown"
+    }
+
     checks.sort((a, b) => {
       const aMatches = exec.includes(a.name)
       const bMatches = exec.includes(b.name)
@@ -102,12 +113,7 @@ export namespace Installation {
     })
 
     for (const check of checks) {
-      // Timeout each package manager check to prevent hanging on Windows
-      // where commands like `npm list -g` can block indefinitely.
-      const output = await Promise.race([
-        check.command(),
-        new Promise<string>((resolve) => setTimeout(() => resolve(""), 5000)),
-      ])
+      const output = await check.command()
       const installedName =
         check.name === "brew" || check.name === "choco" || check.name === "scoop" ? "opencode" : "opencode-ai"
       if (output.includes(installedName)) {
