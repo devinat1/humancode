@@ -150,6 +150,22 @@ export function win32FixStdinIsTTY() {
   if (process.platform !== "win32") return
   if (process.stdin.isTTY) return
 
+  // The Node.js wrapper (bin/humancode) passes its own TTY detection via env var.
+  // This is more reliable than kernel32 FFI because spawnSync can create internal
+  // pipes for stdio: "inherit", making GetFileType return FILE_TYPE_PIPE even when
+  // the parent's stdin is a real console handle.
+  const parentStdinTTY = process.env.OPENCODE_STDIN_IS_TTY
+  if (parentStdinTTY === "1") {
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: true,
+      writable: true,
+      configurable: true,
+    })
+    return
+  }
+  if (parentStdinTTY === "0") return // genuinely piped by the user
+
+  // No env var — launched directly without the wrapper. Fall back to kernel32 FFI.
   if (!load()) {
     // Can't load kernel32 FFI — default to TTY to prevent blocking forever.
     Object.defineProperty(process.stdin, "isTTY", {
