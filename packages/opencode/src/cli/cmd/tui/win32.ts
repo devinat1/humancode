@@ -3,7 +3,9 @@ import { dlopen, ptr } from "bun:ffi"
 const STD_INPUT_HANDLE = -10
 const ENABLE_PROCESSED_INPUT = 0x0001
 
+const FILE_TYPE_DISK = 0x0001
 const FILE_TYPE_CHAR = 0x0002
+const FILE_TYPE_PIPE = 0x0003
 
 const kernel = () =>
   dlopen("kernel32.dll", {
@@ -139,16 +141,32 @@ export function win32InstallCtrlCGuard() {
  * This causes code guarded by `!process.stdin.isTTY` (e.g. reading
  * piped input via Bun.stdin.text()) to block forever on a terminal.
  *
- * Uses kernel32 GetFileType to check if stdin is FILE_TYPE_CHAR (console).
- * If so, patches process.stdin.isTTY to true.
+ * Uses kernel32 GetFileType to positively identify pipes and files.
+ * If stdin is NOT a pipe or file, patches process.stdin.isTTY to true.
+ * This "default to TTY" approach is safer: a false-positive TTY just
+ * skips piped input, while a false-negative causes a permanent hang.
  */
 export function win32FixStdinIsTTY() {
   if (process.platform !== "win32") return
   if (process.stdin.isTTY) return
-  if (!load()) return
+
+  if (!load()) {
+    // Can't load kernel32 FFI — default to TTY to prevent blocking forever.
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: true,
+      writable: true,
+      configurable: true,
+    })
+    return
+  }
 
   const handle = k32!.symbols.GetStdHandle(STD_INPUT_HANDLE)
-  if (k32!.symbols.GetFileType(handle) === FILE_TYPE_CHAR) {
+  const fileType = k32!.symbols.GetFileType(handle)
+
+  // Only keep isTTY as false when stdin is definitively a pipe or disk file.
+  // For console handles (FILE_TYPE_CHAR), unknown types, or errors,
+  // treat as TTY to prevent Bun.stdin.text() from blocking forever.
+  if (fileType !== FILE_TYPE_PIPE && fileType !== FILE_TYPE_DISK) {
     Object.defineProperty(process.stdin, "isTTY", {
       value: true,
       writable: true,
