@@ -6,6 +6,13 @@ const path = require("path")
 const os = require("os")
 
 function run(target) {
+  // On Windows, tell the child process whether the parent's stdin is a real TTY.
+  // Node.js spawnSync can create internal pipes for stdio: "inherit", causing the
+  // Bun compiled binary to misdetect stdin as a pipe instead of a console handle.
+  if (process.platform === "win32") {
+    process.env.OPENCODE_STDIN_IS_TTY = process.stdin.isTTY ? "1" : "0"
+  }
+
   const result = childProcess.spawnSync(target, process.argv.slice(2), {
     stdio: "inherit",
   })
