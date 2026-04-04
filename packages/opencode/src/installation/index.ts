@@ -102,7 +102,12 @@ export namespace Installation {
     })
 
     for (const check of checks) {
-      const output = await check.command()
+      // Timeout each package manager check to prevent hanging on Windows
+      // where commands like `npm list -g` can block indefinitely.
+      const output = await Promise.race([
+        check.command(),
+        new Promise<string>((resolve) => setTimeout(() => resolve(""), 5000)),
+      ])
       const installedName =
         check.name === "brew" || check.name === "choco" || check.name === "scoop" ? "opencode" : "opencode-ai"
       if (output.includes(installedName)) {
