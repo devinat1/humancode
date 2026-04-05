@@ -214,7 +214,37 @@ if (Script.release) {
       await $`zip -r ../../${key}.zip *`.cwd(`dist/${key}/bin`)
     }
   }
-  await $`gh release upload v${Script.version} ./dist/*.zip ./dist/*.tar.gz --clobber`
+
+  // Build Windows NSIS installer if both Windows binary variants were built
+  const windowsAvx2Binary = "dist/humancode-windows-x64/bin/humancode.exe"
+  const windowsBaselineBinary = "dist/humancode-windows-x64-baseline/bin/humancode.exe"
+  if (fs.existsSync(windowsAvx2Binary) && fs.existsSync(windowsBaselineBinary)) {
+    const nsiScript = path.join(__dirname, "windows-installer.nsi")
+    const outFile = path.resolve("dist/HumanCode-Setup-x64.exe")
+    const licenseFile = path.resolve(dir, "../../LICENSE")
+    const iconFile = path.resolve(dir, "../desktop/src-tauri/icons/prod/icon.ico")
+
+    // Convert semver to X.X.X.X format for VIProductVersion (strip prerelease suffix)
+    const semverMatch = /^(\d+\.\d+\.\d+)/.exec(Script.version)
+    const versionQuad = semverMatch ? `${semverMatch[1]}.0` : "0.0.0.0"
+
+    await $`makensis \
+      -DVERSION=${Script.version} \
+      -DVERSION_QUAD=${versionQuad} \
+      -DAVX2_BINARY=${path.resolve(windowsAvx2Binary)} \
+      -DBASELINE_BINARY=${path.resolve(windowsBaselineBinary)} \
+      -DLICENSE_FILE=${licenseFile} \
+      -DICON_FILE=${iconFile} \
+      -DOUTFILE=${outFile} \
+      ${nsiScript}`
+    console.log("Built Windows installer: HumanCode-Setup-x64.exe")
+  }
+
+  const uploadGlobs = ["./dist/*.zip", "./dist/*.tar.gz"]
+  if (fs.existsSync("dist/HumanCode-Setup-x64.exe")) {
+    uploadGlobs.push("./dist/HumanCode-Setup-x64.exe")
+  }
+  await $`gh release upload v${Script.version} ${uploadGlobs.join(" ")} --clobber`
 }
 
 export { binaries }
