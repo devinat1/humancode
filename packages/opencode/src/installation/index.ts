@@ -62,6 +62,24 @@ export namespace Installation {
     if (process.execPath.includes(path.join(".local", "bin"))) return "curl"
     const exec = process.execPath.toLowerCase()
 
+    // On Windows, detect installation method from exec path only.
+    // Running subprocess commands (npm list, pnpm list, etc.) on Windows can
+    // hang indefinitely, leak output to the console, or disrupt the TUI —
+    // even with .quiet() and timeouts — because Windows console handles are
+    // shared across the process and its child processes.
+    if (process.platform === "win32") {
+      // NSIS installer: C:\Program Files\HumanCode\bin or %LOCALAPPDATA%\HumanCode\bin
+      if (exec.includes(path.join("humancode", "bin").toLowerCase())) return "unknown"
+      // Package managers leave traces in the exec path
+      if (exec.includes("scoop")) return "scoop"
+      if (exec.includes("chocolatey")) return "choco"
+      if (exec.includes("pnpm")) return "pnpm"
+      if (exec.includes("yarn")) return "yarn"
+      if (exec.includes("bun")) return "bun"
+      if (exec.includes("npm")) return "npm"
+      return "unknown"
+    }
+
     const checks = [
       {
         name: "npm" as const,
@@ -220,6 +238,9 @@ export namespace Installation {
 
     if (detectedMethod === "npm" || detectedMethod === "bun" || detectedMethod === "pnpm") {
       const registry = await iife(async () => {
+        // On Windows, skip running `npm config get registry` to avoid spawning
+        // a subprocess that can hang or disrupt the TUI console.
+        if (process.platform === "win32") return "https://registry.npmjs.org"
         const r = (await $`npm config get registry`.quiet().nothrow().text()).trim()
         const reg = r || "https://registry.npmjs.org"
         return reg.endsWith("/") ? reg.slice(0, -1) : reg
