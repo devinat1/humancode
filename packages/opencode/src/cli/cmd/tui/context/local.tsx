@@ -40,7 +40,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         current: string
         manuallySelected: boolean
       }>({
-        current: agents()[0].name,
+        current: agents().find((x) => x.name === "adaptive")?.name ?? agents()[0].name,
         manuallySelected: false,
       })
       const { theme } = useTheme()
