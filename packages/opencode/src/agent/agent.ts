@@ -422,9 +422,9 @@ export namespace Agent {
       return agent.name
     }
 
-    const primaryVisible = Object.values(agents).find((a) => a.mode !== "subagent" && a.hidden !== true)
-    if (!primaryVisible) throw new Error("no primary visible agent found")
-    return primaryVisible.name
+    const primary = Object.values(agents).filter((a) => a.mode !== "subagent" && a.hidden !== true)
+    if (!primary.length) throw new Error("no primary visible agent found")
+    return primary.find((a) => a.name === "adaptive")?.name ?? primary[0].name
   }
 
   export async function generate(input: { description: string; model?: { providerID: string; modelID: string } }) {
