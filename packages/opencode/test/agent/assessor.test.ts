@@ -32,9 +32,17 @@ describe("Assessor", () => {
 
   test("high complexity returns debug mode", () => {
     // scope=10 (refactor), no file refs => +5, complexity=15 is vibe boundary
-    // complexity=15 produces confidence=50 which is < 75, so routes to adaptive
+    // complexity=15 produces confidence=50 which is < 75, so routes to adaptive by default
     const result = Assessor.analyze("refactor the entire authentication system with no file references")
     expect(result.mode).toBe("adaptive")
+    expect(result.complexity).toBe(15)
+  })
+
+  test("forceConcreteMode skips adaptive fallback", () => {
+    // Same prompt as above, but with forceConcreteMode
+    const result = Assessor.analyze("refactor the entire authentication system with no file references", true)
+    expect(result.mode).not.toBe("adaptive")
+    expect(result.mode).toBe("vibe")
     expect(result.complexity).toBe(15)
   })
 

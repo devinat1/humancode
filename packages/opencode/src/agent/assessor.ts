@@ -58,7 +58,7 @@ export namespace Assessor {
     return Math.min(95, 50 + margin * 3)
   }
 
-  export function analyze(prompt: string): Result {
+  export function analyze(prompt: string, forceConcreteMode = false): Result {
     const result = ((): Result => {
       if (hasLearningIntent(prompt)) {
         return {
@@ -107,7 +107,7 @@ export namespace Assessor {
       }
     })()
 
-    if (result.confidence < 75) {
+    if (!forceConcreteMode && result.confidence < 75) {
       return { mode: "adaptive", confidence: result.confidence, reason: `Low confidence (${result.confidence}%) — using adaptive mode to dynamically select`, complexity: result.complexity }
     }
     return result

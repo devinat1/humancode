@@ -572,9 +572,11 @@ export function Prompt(props: PromptProps) {
     const currentMode = store.mode
     const variant = local.model.variant.current()
 
-    // Auto-select mode if user hasn't manually chosen
-    if (!local.agent.manuallySelected()) {
-      const result = Assessor.analyze(inputText)
+    // In adaptive mode, always reassess and pick a concrete mode per prompt.
+    // Otherwise, auto-select mode if user hasn't manually chosen.
+    const isAdaptive = local.agent.current().name === "adaptive"
+    if (isAdaptive || !local.agent.manuallySelected()) {
+      const result = Assessor.analyze(inputText, isAdaptive)
       local.agent.set(result.mode)
       // Reset manual selection flag since this was auto-selected
       local.agent.resetManualSelection()
@@ -666,6 +668,10 @@ export function Prompt(props: PromptProps) {
       parts: [],
     })
     setStore("extmarkToPartIndex", new Map())
+    // If we were in adaptive mode, revert back so next prompt also gets reassessed
+    if (isAdaptive) {
+      local.agent.set("adaptive")
+    }
     // Reset manual selection so next prompt can be auto-assessed
     local.agent.resetManualSelection()
     props.onSubmit?.()
