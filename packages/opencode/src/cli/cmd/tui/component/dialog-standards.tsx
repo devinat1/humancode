@@ -17,7 +17,7 @@ const CATALOG: { key: keyof Standards.Config["standards"]; label: string; descri
 
 const DEFAULTS: Record<keyof Standards.Config["standards"], boolean> = {
   clean: true,
-  solid: true,
+  solid: false,
   oop: false,
   bob: false,
   typescript_react: false,
@@ -37,14 +37,15 @@ export function DialogStandards(props: { directory: string }) {
 
   const [enabled, setEnabled] = createSignal<Record<string, boolean>>({ ...DEFAULTS })
 
-  const options = createMemo<DialogSelectOption<string>[]>(() =>
-    CATALOG.map((item) => ({
+  const options = createMemo<DialogSelectOption<string>[]>(() => {
+    const state = enabled()
+    return CATALOG.map((item) => ({
       value: item.key,
       title: item.label,
       description: item.description,
-      footer: <CheckIcon checked={!!enabled()[item.key]} />,
-    })),
-  )
+      footer: <CheckIcon checked={!!state[item.key]} />,
+    }))
+  })
 
   const keybinds = createMemo(() => [
     {
