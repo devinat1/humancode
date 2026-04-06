@@ -40,3 +40,31 @@ describe("MODE_CONSTRAINTS", () => {
     expect(MODE_CONSTRAINTS.adaptive).toContain("mode transition")
   })
 })
+
+import BASE_OPERATIONS from "../../src/agent/prompt/base-operations.txt"
+
+describe("BASE_OPERATIONS", () => {
+  test("contains tone and style section", () => {
+    expect(BASE_OPERATIONS).toContain("# Tone and style")
+  })
+
+  test("contains tool usage policy section", () => {
+    expect(BASE_OPERATIONS).toContain("# Tool usage policy")
+  })
+
+  test("contains professional objectivity section", () => {
+    expect(BASE_OPERATIONS).toContain("# Professional objectivity")
+  })
+
+  test("contains code references section", () => {
+    expect(BASE_OPERATIONS).toContain("# Code references")
+  })
+
+  test("does NOT contain TodoWrite instructions", () => {
+    expect(BASE_OPERATIONS).not.toContain("TodoWrite")
+  })
+
+  test("does NOT contain 'best coding agent' identity", () => {
+    expect(BASE_OPERATIONS).not.toContain("best coding agent")
+  })
+})
