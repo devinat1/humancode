@@ -1,9 +1,8 @@
 import { BusEvent } from "@/bus/bus-event"
 import { Bus } from "@/bus"
-import { $ } from "bun"
-import path from "path"
 import z from "zod"
 import { Log } from "@/util/log"
+import { git } from "@/util/git"
 import { Instance } from "./instance"
 import { FileWatcher } from "@/file/watcher"
 
@@ -29,12 +28,12 @@ export namespace Vcs {
   export type Info = z.infer<typeof Info>
 
   async function currentBranch() {
-    return $`git rev-parse --abbrev-ref HEAD`
-      .quiet()
-      .nothrow()
-      .cwd(Instance.worktree)
-      .text()
-      .then((x) => x.trim())
+    return git(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: Instance.worktree })
+      .then(async (r) => {
+        if (r.exitCode !== 0) return undefined
+        const text = await r.text()
+        return text.trim()
+      })
       .catch(() => undefined)
   }
 

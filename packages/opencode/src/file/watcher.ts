@@ -11,7 +11,7 @@ import { createWrapper } from "@parcel/watcher/wrapper"
 import { lazy } from "@/util/lazy"
 import { withTimeout } from "@/util/timeout"
 import type ParcelWatcher from "@parcel/watcher"
-import { $ } from "bun"
+import { git } from "@/util/git"
 import { Flag } from "@/flag/flag"
 import { readdir } from "fs/promises"
 
@@ -88,12 +88,12 @@ export namespace FileWatcher {
         if (sub) subs.push(sub)
       }
 
-      const vcsDir = await $`git rev-parse --git-dir`
-        .quiet()
-        .nothrow()
-        .cwd(Instance.worktree)
-        .text()
-        .then((x) => path.resolve(Instance.worktree, x.trim()))
+      const vcsDir = await git(["rev-parse", "--git-dir"], { cwd: Instance.worktree })
+        .then(async (r) => {
+          if (r.exitCode !== 0) return undefined
+          const text = await r.text()
+          return path.resolve(Instance.worktree, text.trim())
+        })
         .catch(() => undefined)
       if (vcsDir && !cfgIgnores.includes(".git") && !cfgIgnores.includes(vcsDir)) {
         const gitDirContents = await readdir(vcsDir).catch(() => [])
