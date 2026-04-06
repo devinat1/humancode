@@ -11,13 +11,13 @@ export interface GitResult {
 /**
  * Run a git command.
  *
- * Uses Bun's lightweight `$` shell by default.  When the process is running
- * as an ACP client, child processes inherit the parent's stdin pipe which
- * carries protocol data – on Windows this causes git to deadlock.  In that
- * case we fall back to `Bun.spawn` with `stdin: "ignore"`.
+ * Uses Bun's lightweight `$` shell by default.  On Windows (or when running
+ * as an ACP client), child processes inherit the console stdin handle which
+ * causes git to deadlock or disrupt the TUI.  In those cases we fall back to
+ * `Bun.spawn` with `stdin: "ignore"`.
  */
 export async function git(args: string[], opts: { cwd: string; env?: Record<string, string> }): Promise<GitResult> {
-  if (Flag.OPENCODE_CLIENT === "acp") {
+  if (Flag.OPENCODE_CLIENT === "acp" || process.platform === "win32") {
     try {
       const proc = Bun.spawn(["git", ...args], {
         stdin: "ignore",
