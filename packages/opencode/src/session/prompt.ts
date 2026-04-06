@@ -17,6 +17,7 @@ import { ProviderTransform } from "../provider/transform"
 import { SystemPrompt } from "./system"
 import { InstructionPrompt } from "./instruction"
 import { Plugin } from "../plugin"
+import { MODE_CONSTRAINTS } from "@/agent/mode-constraints"
 import PROMPT_PLAN from "../session/prompt/plan.txt"
 import BUILD_SWITCH from "../session/prompt/build-switch.txt"
 import MAX_STEPS from "../session/prompt/max-steps.txt"
@@ -82,6 +83,20 @@ export namespace SessionPrompt {
       }
     },
   )
+
+  export const REMINDER_INTERVAL = 5
+
+  export function buildModeReminder(agentName: string, assistantCount: number): string | undefined {
+    if (assistantCount <= 0 || assistantCount % REMINDER_INTERVAL !== 0) return undefined
+    const constraint = MODE_CONSTRAINTS[agentName]
+    if (!constraint) return undefined
+    return [
+      `<system-reminder>`,
+      `MODE REMINDER: You are in ${agentName} mode. ${constraint}`,
+      `If your recent behavior has drifted from this, correct immediately.`,
+      `</system-reminder>`,
+    ].join("\n")
+  }
 
   export function assertNotBusy(sessionID: string) {
     const match = state()[sessionID]
@@ -651,6 +666,11 @@ export namespace SessionPrompt {
 
       // Build system prompt, adding structured output instruction if needed
       const system = [...(await SystemPrompt.environment(model)), ...(await InstructionPrompt.system())]
+      const assistantCount = sessionMessages.filter((m) => m.info.role === "assistant").length
+      const modeReminder = buildModeReminder(agent.name, assistantCount)
+      if (modeReminder) {
+        system.push(modeReminder)
+      }
       const format = lastUser.format ?? { type: "text" }
       if (format.type === "json_schema") {
         system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)

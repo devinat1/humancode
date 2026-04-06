@@ -23,6 +23,8 @@ import { Flag } from "@/flag/flag"
 import { PermissionNext } from "@/permission/next"
 import { Auth } from "@/auth"
 import { DebugPhase } from "./debug-phase"
+import { MODE_CONSTRAINTS } from "@/agent/mode-constraints"
+import BASE_OPERATIONS from "@/agent/prompt/base-operations.txt"
 
 export namespace LLM {
   const log = Log.create({ service: "llm" })
@@ -43,6 +45,24 @@ export namespace LLM {
   }
 
   export type StreamOutput = StreamTextResult<ToolSet, unknown>
+
+  export function wrapModePrompt(agent: { name: string; prompt?: string }): string | undefined {
+    if (!agent.prompt) return undefined
+
+    const constraint = MODE_CONSTRAINTS[agent.name]
+    if (!constraint) return agent.prompt
+
+    return [
+      `<CRITICAL-INSTRUCTION priority="highest">`,
+      agent.prompt,
+      `\nREMINDER — your non-negotiable constraint: ${constraint}`,
+      `</CRITICAL-INSTRUCTION>`,
+      "",
+      BASE_OPERATIONS,
+    ]
+      .filter((x) => x !== undefined)
+      .join("\n")
+  }
 
   export async function stream(input: StreamInput) {
     const l = log
@@ -70,7 +90,10 @@ export namespace LLM {
       [
         // use agent prompt otherwise provider prompt
         // For Codex sessions, skip SystemPrompt.provider() since it's sent via options.instructions
-        ...(input.agent.prompt ? [input.agent.prompt] : isCodex ? [] : SystemPrompt.provider(input.model)),
+        ...(() => {
+          const wrapped = wrapModePrompt(input.agent)
+          return wrapped ? [wrapped] : isCodex ? [] : SystemPrompt.provider(input.model)
+        })(),
         // any custom prompt passed into this call
         ...input.system,
         // any custom prompt from last user message
