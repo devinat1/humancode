@@ -68,3 +68,43 @@ describe("BASE_OPERATIONS", () => {
     expect(BASE_OPERATIONS).not.toContain("best coding agent")
   })
 })
+
+import { LLM } from "../../src/session/llm"
+
+describe("wrapModePrompt", () => {
+  test("wraps native mode prompt with CRITICAL-INSTRUCTION tags", () => {
+    const agent = { name: "pair", prompt: "You are a pair partner." } as any
+    const result = LLM.wrapModePrompt(agent)
+    expect(result).toContain("<CRITICAL-INSTRUCTION priority=\"highest\">")
+    expect(result).toContain("You are a pair partner.")
+    expect(result).toContain("</CRITICAL-INSTRUCTION>")
+    expect(result).toContain("REMINDER")
+    expect(result).toContain(MODE_CONSTRAINTS.pair)
+  })
+
+  test("appends BASE_OPERATIONS after the critical block", () => {
+    const agent = { name: "claw", prompt: "You are autonomous." } as any
+    const result = LLM.wrapModePrompt(agent)
+    const criticalEnd = result!.indexOf("</CRITICAL-INSTRUCTION>")
+    const baseStart = result!.indexOf("# Tone and style")
+    expect(baseStart).toBeGreaterThan(criticalEnd)
+  })
+
+  test("returns undefined when agent has no prompt", () => {
+    const agent = { name: "build" } as any
+    const result = LLM.wrapModePrompt(agent)
+    expect(result).toBeUndefined()
+  })
+
+  test("returns unwrapped prompt for non-constrained agents", () => {
+    const agent = { name: "explore", prompt: "You are an explorer." } as any
+    const result = LLM.wrapModePrompt(agent)
+    expect(result).toBe("You are an explorer.")
+  })
+
+  test("returns unwrapped prompt for custom user agents", () => {
+    const agent = { name: "my-custom-agent", prompt: "Custom instructions." } as any
+    const result = LLM.wrapModePrompt(agent)
+    expect(result).toBe("Custom instructions.")
+  })
+})
