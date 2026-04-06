@@ -1,0 +1,8 @@
+standards:
+  clean: true
+  solid: false
+  oop: false
+  bob: false
+  typescript_react: false
+  ddd: false
+custom:
