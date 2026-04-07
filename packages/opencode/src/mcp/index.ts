@@ -3,12 +3,14 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js"
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js"
 import {
   CallToolResultSchema,
   type Tool as MCPToolDef,
   ToolListChangedNotificationSchema,
 } from "@modelcontextprotocol/sdk/types.js"
+import { createServer as createDebuggerServer } from "@opencode-ai/debugger/server"
 import { Config } from "../config/config"
 import { Log } from "../util/log"
 import { NamedError } from "@opencode-ai/util/error"
@@ -18,7 +20,6 @@ import { Installation } from "../installation"
 import { withTimeout } from "@/util/timeout"
 import { McpOAuthProvider } from "./oauth-provider"
 import { McpOAuthCallback } from "./oauth-callback"
-import path from "path"
 import { McpAuth } from "./auth"
 import { BusEvent } from "../bus/bus-event"
 import { Bus } from "@/bus"
@@ -161,16 +162,40 @@ export namespace MCP {
     return typeof entry === "object" && entry !== null && "type" in entry
   }
 
-  const DEBUGGER_ENTRY = path.resolve(
-    import.meta.dirname,
-    "../../../debugger/src/index.ts",
-  )
+  const DEFAULT_MCP_SERVERS: Record<string, Config.Mcp> = {}
 
-  const DEFAULT_MCP_SERVERS: Record<string, Config.Mcp> = {
-    debugger: {
-      type: "local",
-      command: ["bun", "run", DEBUGGER_ENTRY],
-    },
+  // Create the built-in debugger MCP server in-process using InMemoryTransport.
+  // This avoids spawning a separate process, which fails in compiled binaries
+  // where import.meta.dirname resolves to a virtual filesystem path.
+  async function createBuiltinDebugger(): Promise<{
+    mcpClient: MCPClient | undefined
+    status: Status
+  }> {
+    try {
+      const debuggerServer = createDebuggerServer()
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+      await debuggerServer.connect(serverTransport)
+
+      const client = new Client({
+        name: "opencode",
+        version: Installation.VERSION,
+      })
+      await client.connect(clientTransport)
+      registerNotificationHandlers(client, "debugger")
+
+      return { mcpClient: client, status: { status: "connected" } }
+    } catch (error) {
+      log.error("built-in debugger startup failed", {
+        error: error instanceof Error ? error.message : String(error),
+      })
+      return {
+        mcpClient: undefined,
+        status: {
+          status: "failed" as const,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      }
+    }
   }
 
   async function getEffectiveMcpConfig() {
@@ -189,6 +214,17 @@ export namespace MCP {
       const config = await getEffectiveMcpConfig()
       const clients: Record<string, MCPClient> = {}
       const status: Record<string, Status> = {}
+
+      // Create built-in debugger if user hasn't configured a custom one
+      if (!("debugger" in config)) {
+        const result = await createBuiltinDebugger().catch(() => undefined)
+        if (result) {
+          status.debugger = result.status
+          if (result.mcpClient) {
+            clients.debugger = result.mcpClient
+          }
+        }
+      }
 
       await Promise.all(
         Object.entries(config).map(async ([key, mcp]) => {
@@ -521,6 +557,11 @@ export namespace MCP {
     const config = await getEffectiveMcpConfig()
     const result: Record<string, Status> = {}
 
+    // Include built-in servers (e.g. debugger)
+    for (const [key, st] of Object.entries(s.status)) {
+      result[key] = st
+    }
+
     // Include all configured MCPs from config, not just connected ones
     for (const [key, mcp] of Object.entries(config)) {
       if (!isMcpConfigured(mcp)) continue
@@ -535,6 +576,28 @@ export namespace MCP {
   }
 
   export async function connect(name: string) {
+    // Handle built-in debugger reconnection
+    if (name === "debugger") {
+      const config = await getEffectiveMcpConfig()
+      if (!("debugger" in config)) {
+        const s = await state()
+        const existingClient = s.clients[name]
+        if (existingClient) {
+          await existingClient.close().catch((error) => {
+            log.error("Failed to close existing MCP client", { name, error })
+          })
+        }
+        const result = await createBuiltinDebugger().catch(() => undefined)
+        if (result) {
+          s.status[name] = result.status
+          if (result.mcpClient) {
+            s.clients[name] = result.mcpClient
+          }
+        }
+        return
+      }
+    }
+
     const config = await getEffectiveMcpConfig()
     const mcp = config[name]
     if (!mcp) {
