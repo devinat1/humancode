@@ -146,6 +146,13 @@ const names = (() => {
     if (baseline) return [`${base}-baseline`, base]
     return [base, `${base}-baseline`]
   }
+
+  // Windows ARM64 can run x64 binaries via emulation — fall back to x64 variants
+  if (platform === "windows" && arch === "arm64") {
+    const x64Base = "humancode-windows-x64"
+    return [base, `${x64Base}-baseline`, x64Base]
+  }
+
   return [base]
 })()
 
