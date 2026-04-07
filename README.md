@@ -13,6 +13,23 @@ npm i -g humancode
 brew install humancode
 ```
 
+### Windows
+
+On Windows, you can install via npm (requires Node.js):
+
+```powershell
+npm i -g humancode
+```
+
+Or download the installer from [GitHub Releases](https://github.com/devinat1/humancode/releases) (`HumanCode-Setup-x64.exe`).
+
+You can also install via [Scoop](https://scoop.sh) or [Chocolatey](https://chocolatey.org):
+
+```powershell
+scoop install humancode
+choco install humancode
+```
+
 ## Usage
 
 ```bash
