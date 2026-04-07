@@ -27,7 +27,7 @@ You can also install via [Scoop](https://scoop.sh) or [Chocolatey](https://choco
 
 ```powershell
 scoop install humancode
-choco install opencode
+choco install humancode
 ```
 
 ## Usage
