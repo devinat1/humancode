@@ -37,9 +37,7 @@ export namespace Assessor {
     providerID: string
     modelID: string
   }): Promise<Result> {
-    // Use small model for fast classification, fall back to user's model
-    const smallModel = await Provider.getSmallModel(input.providerID)
-    const model = smallModel ?? (await Provider.getModel(input.providerID, input.modelID))
+    const model = await Provider.getModel(input.providerID, input.modelID)
     const language = await Provider.getLanguage(model)
 
     // Phase 1: quick classify
