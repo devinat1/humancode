@@ -2,11 +2,45 @@
 
 The AI coding agent that writes code with you, not for you.
 
-Have you ever shipped a feature without fully understanding it? Have you ever felt lost when working on a feature? Agents such as Claude Code, Codex, Cursor, etc. generate billions of lines of code every day. Humans are able to ship much faster thanks to these agents. However, this speed comes at a cost: ownership. Humancode enables interactively debugging the changes made, one step at a time, and uses the socratic method to question you about each change it made.
+AI agents generate billions of lines of code every day. Humans ship faster, but at a cost: ownership. HumanCode gives you multiple agent modes, from pair programming to autonomous coding, so you stay in control.
 
-Demo: https://www.youtube.com/watch?v=v_8BVseTydY
+## Usage
+
+```bash
+humancode
+```
+
+Press `Tab` to switch between agent modes.
+
+## Agent Modes
+
+HumanCode automatically selects the best mode for your prompt, or you can switch manually with `Tab`.
+
+### Pair
+
+Pair programming partner. Suggests approaches and explains trade-offs but never writes code. Asks guiding questions to develop your thinking and reviews code you write. Best for learning, understanding existing code, and exploring design decisions.
+
+### Debug
+
+Writes code one step at a time and walks you through each change using the debugger. Sets breakpoints, pauses for comprehension questions, and only moves on when you understand. Best for complex refactors, risky changes, and untested code.
+
+### Vibe
+
+Multi-task manager. Parses your prompt into discrete tasks, executes them sequentially with self-review after each one, and presents organized results. Best for requests with multiple distinct tasks or new features spanning several files.
+
+### Claw
+
+Fully autonomous agent. Takes a single prompt, plans, executes, self-reviews against quality standards, writes tests, and commits — all without human checkpoints. Runs in an isolated git worktree for safety. Best for straightforward, well-scoped mechanical tasks.
+
+### Adaptive
+
+Dynamically transitions between modes based on task complexity. Escalates to Debug when things get risky (consecutive test failures, cross-package changes) and de-escalates to Claw when work becomes routine. Selected by default when the assessor isn't confident about which mode fits best.
+
+Demo: 
 
 ## Install
+
+### macOS / Linux
 
 ```bash
 npm i -g humancode
@@ -14,8 +48,6 @@ brew install humancode
 ```
 
 ### Windows
-
-On Windows, you can install via npm (requires Node.js):
 
 ```powershell
 npm i -g humancode
@@ -29,18 +61,6 @@ You can also install via [Scoop](https://scoop.sh) or [Chocolatey](https://choco
 scoop install humancode
 choco install humancode
 ```
-
-## Usage
-
-```bash
-humancode
-```
-
-## Debug Mode
-
-HumanCode includes a debug agent that writes code one step at a time and walks you through each step with the VS Code debugger. Set breakpoints, inspect variables, and step through execution to understand exactly what changed and why. Switch to it with `Tab`.
-
-Requires VS Code or Cursor to be open with the [Agentic Debugger](https://open-vsx.org/extension/devinat1/agentic-debugger) extension installed.
 
 ## License
 
