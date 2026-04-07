@@ -1,115 +1,113 @@
+import { generateText } from "ai"
+import z from "zod"
+import { Provider } from "../provider/provider"
+import { Instance } from "../project/instance"
+import { Log } from "../util/log"
+import ASSESSOR_PROMPT from "./prompt/assessor.txt"
+
+const log = Log.create({ service: "assessor" })
+
+const ClassifySchema = z.object({
+  mode: z.enum(["pair", "debug", "vibe", "claw"]),
+  confidence: z.number().min(0).max(100),
+  reason: z.string(),
+})
+
+const JSON_SUFFIX = `
+
+Respond with ONLY a JSON object in this exact format, no other text:
+{"mode": "pair|debug|vibe|claw", "confidence": 0-100, "reason": "brief explanation"}`
+
+function parseJSON(text: string): z.infer<typeof ClassifySchema> | undefined {
+  const match = text.match(/\{[\s\S]*\}/)
+  if (!match) return undefined
+  const parsed = ClassifySchema.safeParse(JSON.parse(match[0]))
+  return parsed.success ? parsed.data : undefined
+}
+
 export namespace Assessor {
   export type Result = {
-    mode: "pair" | "debug" | "vibe" | "claw" | "adaptive"
+    mode: "pair" | "debug" | "vibe" | "claw"
     confidence: number
     reason: string
-    complexity: number
   }
 
-  const LEARNING_KEYWORDS = [
-    "explain",
-    "understand",
-    "walk me through",
-    "why does",
-    "how does",
-    "help me learn",
-    "teach me",
-  ]
+  export async function assess(input: {
+    prompt: string
+    providerID: string
+    modelID: string
+  }): Promise<Result> {
+    // Use small model for fast classification, fall back to user's model
+    const smallModel = await Provider.getSmallModel(input.providerID)
+    const model = smallModel ?? (await Provider.getModel(input.providerID, input.modelID))
+    const language = await Provider.getLanguage(model)
 
-  const SCOPE_KEYWORDS: Array<[RegExp, number]> = [
-    [/\b(refactor|redesign|rewrite|rebuild|migrate)\b/i, 10],
-    [/\b(add|implement|create)\b/i, 5],
-    [/\b(fix|typo|rename|update|change)\b/i, 2],
-  ]
+    // Phase 1: quick classify
+    log.info("phase1", { prompt: input.prompt.slice(0, 100), model: model.id })
+    const phase1 = await generateText({
+      model: language,
+      maxOutputTokens: 256,
+      messages: [
+        { role: "system", content: ASSESSOR_PROMPT + JSON_SUFFIX },
+        { role: "user", content: input.prompt },
+      ],
+      temperature: 0.2,
+    })
 
-  const FILE_REF = /[\w/]+\.\w{1,4}\b/g
+    log.info("phase1.raw", { text: phase1.text.trim() })
+    const result = parseJSON(phase1.text)
 
-  function scopeWeight(prompt: string) {
-    for (const [pattern, weight] of SCOPE_KEYWORDS) {
-      if (pattern.test(prompt)) return weight
+    if (!result) {
+      log.warn("phase1.parse-failed", { text: phase1.text.trim() })
+      return { mode: "vibe", confidence: 50, reason: "Could not parse assessor response" }
     }
-    return 2
-  }
 
-  function specificity(prompt: string) {
-    const refs = prompt.match(FILE_REF)
-    if (!refs || refs.length === 0) return 5
-    return refs.length * -2
-  }
+    log.info("phase1.result", { mode: result.mode, confidence: result.confidence, reason: result.reason })
 
-  function complexity(prompt: string) {
-    return scopeWeight(prompt) + specificity(prompt)
-  }
-
-  function hasLearningIntent(prompt: string) {
-    const lower = prompt.toLowerCase()
-    return LEARNING_KEYWORDS.some((kw) => lower.includes(kw))
-  }
-
-  function taskCount(prompt: string) {
-    const parts = prompt
-      .split(/\band\b|;|\d+\.\s|\n-\s|\n\*\s/i)
-      .filter((s) => s.trim().length > 10)
-    return parts.length
-  }
-
-  function complexityConfidence(c: number) {
-    const margin = Math.min(Math.abs(c - 15), Math.abs(c - 30))
-    return Math.min(95, 50 + margin * 3)
-  }
-
-  export function analyze(prompt: string, forceConcreteMode = false): Result {
-    const result = ((): Result => {
-      if (hasLearningIntent(prompt)) {
-        return {
-          mode: "pair",
-          confidence: 90,
-          reason: "Learning intent detected in prompt",
-          complexity: complexity(prompt),
-        }
-      }
-
-      if (taskCount(prompt) >= 2) {
-        return {
-          mode: "vibe",
-          confidence: 85,
-          reason: "Multiple distinct tasks detected",
-          complexity: complexity(prompt),
-        }
-      }
-
-      const c = complexity(prompt)
-      const confidence = complexityConfidence(c)
-
-      if (c < 15) {
-        return {
-          mode: "claw",
-          confidence,
-          reason: `Low complexity score (${c})`,
-          complexity: c,
-        }
-      }
-
-      if (c <= 30) {
-        return {
-          mode: "vibe",
-          confidence,
-          reason: `Medium complexity score (${c})`,
-          complexity: c,
-        }
-      }
-
-      return {
-        mode: "debug",
-        confidence,
-        reason: `High complexity score (${c})`,
-        complexity: c,
-      }
-    })()
-
-    if (!forceConcreteMode && result.confidence < 75) {
-      return { mode: "adaptive", confidence: result.confidence, reason: `Low confidence (${result.confidence}%) — using adaptive mode to dynamically select`, complexity: result.complexity }
+    if (result.confidence >= 80) {
+      return result
     }
-    return result
+
+    // Phase 2: give the model more context and ask again (still uses small model to avoid rate limits)
+    log.info("phase2", { reason: result.reason, model: model.id })
+
+    // Gather basic codebase context for the model to reason about
+    const dir = Instance.directory
+    const phase2 = await generateText({
+      model: language,
+      maxOutputTokens: 512,
+      messages: [
+        {
+          role: "system",
+          content: [
+            ASSESSOR_PROMPT,
+            "",
+            `The project directory is: ${dir}`,
+            "",
+            `Your initial quick assessment was: mode=${result.mode}, confidence=${result.confidence}%, reason="${result.reason}"`,
+            "",
+            "Think more carefully about what mode fits best given the user's request. Consider:",
+            "- Is this a learning/explanation question? → pair",
+            "- Is this a simple mechanical task? → claw",
+            "- Does this involve multiple steps or features? → vibe",
+            "- Is this complex, risky, or involves debugging? → debug",
+            JSON_SUFFIX,
+          ].join("\n"),
+        },
+        { role: "user", content: input.prompt },
+      ],
+      temperature: 0.2,
+    })
+
+    log.info("phase2.raw", { text: phase2.text.trim() })
+    const phase2Result = parseJSON(phase2.text)
+
+    if (!phase2Result) {
+      log.warn("phase2.parse-failed", { text: phase2.text.trim() })
+      return result // Fall back to phase1 result
+    }
+
+    log.info("phase2.result", { mode: phase2Result.mode, confidence: phase2Result.confidence, reason: phase2Result.reason })
+    return phase2Result
   }
 }
