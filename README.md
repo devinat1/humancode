@@ -1,6 +1,6 @@
 # HumanCode
 
-The AI coding agent that writes code with you, not for you.
+The AI coding agent that works with you.
 
 AI agents generate billions of lines of code every day. Humans ship faster, but at a cost: ownership. HumanCode gives you multiple agent modes, from pair programming to autonomous coding, so you stay in control.
 
