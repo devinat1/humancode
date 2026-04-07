@@ -2,7 +2,6 @@ import { test, expect, describe } from "bun:test"
 import { tmpdir } from "../fixture/fixture"
 import { Instance } from "../../src/project/instance"
 import { Agent } from "../../src/agent/agent"
-import { Assessor } from "../../src/agent/assessor"
 import { Standards } from "../../src/agent/standards"
 
 describe("multi-mode system", () => {
@@ -55,21 +54,6 @@ describe("multi-mode system", () => {
         expect(review?.hidden).toBe(true)
       },
     })
-  })
-
-  test("assessor recommends pair for learning prompts", () => {
-    const result = Assessor.analyze("explain how providers work")
-    expect(result.mode).toBe("pair")
-  })
-
-  test("assessor recommends claw for simple tasks", () => {
-    const result = Assessor.analyze("fix typo in README.md")
-    expect(result.mode).toBe("claw")
-  })
-
-  test("assessor recommends vibe for multiple tasks", () => {
-    const result = Assessor.analyze("fix the lint warnings and add tests for session.ts")
-    expect(result.mode).toBe("vibe")
   })
 
   test("standards prompt loads for review agent", async () => {

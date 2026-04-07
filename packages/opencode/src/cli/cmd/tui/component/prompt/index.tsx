@@ -32,7 +32,6 @@ import { useToast } from "../../ui/toast"
 import { useKV } from "../../context/kv"
 import { useTextareaKeybindings } from "../textarea-keybindings"
 import { DialogSkill } from "../dialog-skill"
-import { Assessor } from "@/agent/assessor"
 import { DialogStandards } from "../dialog-standards"
 import path from "path"
 
@@ -572,15 +571,8 @@ export function Prompt(props: PromptProps) {
     const currentMode = store.mode
     const variant = local.model.variant.current()
 
-    // In adaptive mode, always reassess and pick a concrete mode per prompt.
-    // Otherwise, auto-select mode if user hasn't manually chosen.
+    // Track whether we're in adaptive mode so we can revert after submission
     const isAdaptive = local.agent.current().name === "adaptive"
-    if (isAdaptive || !local.agent.manuallySelected()) {
-      const result = Assessor.analyze(inputText, isAdaptive)
-      local.agent.set(result.mode)
-      // Reset manual selection flag since this was auto-selected
-      local.agent.resetManualSelection()
-    }
 
     // When entering vibe or claw mode, ensure standards are configured
     const currentAgentName = local.agent.current().name

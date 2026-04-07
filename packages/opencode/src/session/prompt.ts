@@ -46,6 +46,7 @@ import { LLM } from "./llm"
 import { iife } from "@/util/iife"
 import { Shell } from "@/shell/shell"
 import { Truncate } from "@/tool/truncation"
+import { Assessor } from "@/agent/assessor"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -173,6 +174,38 @@ export namespace SessionPrompt {
   export const prompt = fn(PromptInput, async (input) => {
     const session = await Session.get(input.sessionID)
     await SessionRevert.cleanup(session)
+
+    // Pre-flight: when agent is "adaptive", run LLM-based assessment to pick a concrete mode
+    if (input.agent === "adaptive" && input.model) {
+      const promptText = (input.parts ?? [])
+        .filter((p): p is { type: "text"; text: string } => p.type === "text" && "text" in p)
+        .map((p) => p.text)
+        .join("\n")
+      if (promptText.trim()) {
+        try {
+          const result = await Assessor.assess({
+            prompt: promptText,
+            providerID: input.model.providerID,
+            modelID: input.model.modelID,
+          })
+          log.info("assessor resolved", { mode: result.mode, confidence: result.confidence })
+          input.agent = result.mode
+          input.system = `[Adaptive mode selected ${result.mode} mode (${result.confidence}% confidence): ${result.reason}]\nBriefly acknowledge this mode selection and why at the start of your response.`
+        } catch (e: any) {
+          // Unwrap retry wrapper and dump all available error info
+          const inner = e?.lastError ?? e?.cause ?? e
+          const props: Record<string, unknown> = {}
+          for (const key of Object.getOwnPropertyNames(inner)) {
+            try {
+              props[key] = inner[key]
+            } catch {}
+          }
+          log.error("assessor failed", props)
+          input.agent = "vibe"
+          input.system = `[Adaptive mode fell back to vibe mode because the assessor encountered an error.]\nBriefly acknowledge this at the start of your response.`
+        }
+      }
+    }
 
     const message = await createUserMessage(input)
     await Session.touch(input.sessionID)
@@ -666,6 +699,9 @@ export namespace SessionPrompt {
 
       // Build system prompt, adding structured output instruction if needed
       const system = [...(await SystemPrompt.environment(model)), ...(await InstructionPrompt.system())]
+      if (lastUser.system) {
+        system.push(lastUser.system)
+      }
       const assistantCount = sessionMessages.filter((m) => m.info.role === "assistant").length
       const modeReminder = buildModeReminder(agent.name, assistantCount)
       if (modeReminder) {
