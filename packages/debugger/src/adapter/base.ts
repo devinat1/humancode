@@ -6,7 +6,7 @@ import type {
 } from "../dap/types"
 
 export interface LaunchConfig {
-  type: string // "node" | "python"
+  type: string // "node" | "python" | "go"
   program: string
   args?: string[]
   cwd?: string
@@ -15,6 +15,12 @@ export interface LaunchConfig {
   runtimeArgs?: string[]
   pythonPath?: string
   module?: string // python -m module
+
+  // Go-specific
+  dlvPath?: string // override path to `dlv` binary
+  goMode?: "debug" | "test" // override _test.go auto-detection
+  buildFlags?: string // passed to dlv `--build-flags`
+  testFilter?: string // passed as args after `--`, e.g. "-test.run=TestFoo"
 }
 
 export interface StopResult {
