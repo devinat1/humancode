@@ -16,3 +16,28 @@ export function resolveGoMode(config: LaunchConfig): "debug" | "test" {
   if (config.program.endsWith("_test.go")) return "test"
   return "debug"
 }
+
+type PathResolver = (name: string) => string | null
+
+/**
+ * Resolve the path to the `dlv` binary.
+ *
+ * - If `dlvPath` is provided, return it verbatim (caller is responsible for it).
+ * - Otherwise look up `dlv` on PATH via the supplied resolver (defaults to Bun.which).
+ * - If absent, throw with install instructions.
+ *
+ * The resolver is injectable for testability; production callers omit it.
+ */
+export function resolveDlvBinary(
+  opts: { dlvPath?: string },
+  resolver: PathResolver = (name) => Bun.which(name),
+): string {
+  if (opts.dlvPath) return opts.dlvPath
+  const found = resolver("dlv")
+  if (found) return found
+  throw new Error(
+    "Delve (dlv) not found on PATH. Install with:\n" +
+      "  go install github.com/go-delve/delve/cmd/dlv@latest\n" +
+      "Or pass dlvPath in the launch config.",
+  )
+}
