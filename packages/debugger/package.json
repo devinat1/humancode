@@ -6,7 +6,11 @@
   "license": "MIT",
   "bin": { "opencode-debugger": "./src/index.ts" },
   "exports": { "./*": "./src/*.ts" },
-  "scripts": { "typecheck": "tsc --noEmit", "start": "bun run src/index.ts" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "start": "bun run src/index.ts",
+    "test": "bun test"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.25.2",
     "zod": "catalog:"
