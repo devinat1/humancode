@@ -61,6 +61,15 @@ const WAIT_TIMEOUT = 30_000
  *
  * Auto-detects test mode from `_test.go` filenames; pass `goMode` to override.
  * Does NOT support `dlv exec` or `dlv attach` modes — out of scope for v1.
+ *
+ * In test mode, `program` is interpreted as the parent package directory (a
+ * `.go` file path is rewritten to its dirname before being sent to dlv).
+ * Use `testFilter: "-test.run=TestX"` to scope to a single test.
+ *
+ * `--check-go-version=false` is passed to dlv unconditionally because dlv's
+ * bundled Go-version check often lags behind released Go toolchains and
+ * refuses to launch even when DWARF compatibility is fine. VS Code's Go
+ * extension does the same. Tested against dlv 1.26.x.
  */
 export class GoAdapter implements DebugAdapter {
   readonly id = "go"
@@ -95,6 +104,12 @@ export class GoAdapter implements DebugAdapter {
       console.error(`[go-adapter] Process error: ${err.message}`)
     })
 
+    // We watch dlv's stdout for the "DAP server listening at:" line instead
+    // of probing the TCP port. dlv dap does not accept multiple clients —
+    // a probe connection that opens and closes is treated as the first (and
+    // only) client, causing dlv to shut down before our real DapClient
+    // connects (manifests as ECONNREFUSED). The listening-line approach
+    // matches what VS Code's Go extension uses. Tested against dlv 1.26.x.
     let stdoutBuffer = ""
     const ready = new Promise<void>((resolve, reject) => {
       const onData = (chunk: Buffer) => {
