@@ -157,22 +157,160 @@ export class GoAdapter implements DebugAdapter {
     return result
   }
 
-  // [DAP pass-through methods filled in by Task 6]
-  setBreakpoints(_file: string, _bps: SourceBreakpoint[]): Promise<BreakpointResult[]> {
-    throw new Error("not implemented")
+  async setBreakpoints(
+    file: string,
+    breakpoints: SourceBreakpoint[],
+  ): Promise<BreakpointResult[]> {
+    if (!this.client) throw new Error("Not connected")
+
+    const response = await this.client.sendRequest("setBreakpoints", {
+      source: { path: file },
+      breakpoints: breakpoints.map((bp) => ({
+        line: bp.line,
+        column: bp.column,
+        condition: bp.condition,
+        hitCondition: bp.hitCondition,
+        logMessage: bp.logMessage,
+      })),
+    })
+
+    const body = response.body ?? {}
+    const bps = (body.breakpoints ?? []) as any[]
+    return bps.map((bp: any) => ({
+      id: bp.id,
+      verified: bp.verified ?? false,
+      line: bp.line,
+      message: bp.message,
+    }))
   }
-  continue(_threadId?: number): Promise<StopResult> { throw new Error("not implemented") }
-  stepOver(_threadId?: number): Promise<StopResult> { throw new Error("not implemented") }
-  stepIn(_threadId?: number): Promise<StopResult> { throw new Error("not implemented") }
-  stepOut(_threadId?: number): Promise<StopResult> { throw new Error("not implemented") }
-  getCallStack(_threadId?: number): Promise<StackFrame[]> { throw new Error("not implemented") }
-  getVariables(_frameId?: number, _scope?: string, _maxDepth?: number): Promise<Variable[]> {
-    throw new Error("not implemented")
+
+  async continue(threadId?: number): Promise<StopResult> {
+    if (!this.client) throw new Error("Not connected")
+    const stopPromise = this.waitForStop()
+    await this.client.sendRequest("continue", { threadId: threadId ?? this.threadId })
+    return stopPromise
   }
-  evaluate(_expression: string, _frameId?: number): Promise<EvalResult> {
-    throw new Error("not implemented")
+
+  async stepOver(threadId?: number): Promise<StopResult> {
+    if (!this.client) throw new Error("Not connected")
+    const stopPromise = this.waitForStop()
+    await this.client.sendRequest("next", { threadId: threadId ?? this.threadId })
+    return stopPromise
   }
-  disconnect(): Promise<void> { throw new Error("not implemented") }
+
+  async stepIn(threadId?: number): Promise<StopResult> {
+    if (!this.client) throw new Error("Not connected")
+    const stopPromise = this.waitForStop()
+    await this.client.sendRequest("stepIn", { threadId: threadId ?? this.threadId })
+    return stopPromise
+  }
+
+  async stepOut(threadId?: number): Promise<StopResult> {
+    if (!this.client) throw new Error("Not connected")
+    const stopPromise = this.waitForStop()
+    await this.client.sendRequest("stepOut", { threadId: threadId ?? this.threadId })
+    return stopPromise
+  }
+
+  async getCallStack(threadId?: number): Promise<StackFrame[]> {
+    if (!this.client) throw new Error("Not connected")
+
+    const response = await this.client.sendRequest("stackTrace", {
+      threadId: threadId ?? this.threadId,
+      startFrame: 0,
+      levels: 50,
+    })
+
+    const body = response.body ?? {}
+    const frames = (body.stackFrames ?? []) as any[]
+    this.frameIds = frames.map((f: any) => f.id as number)
+
+    return frames.map((f: any) => ({
+      id: f.id,
+      name: f.name,
+      source: f.source ? { path: f.source.path, name: f.source.name } : undefined,
+      line: f.line,
+      column: f.column,
+    }))
+  }
+
+  async getVariables(
+    frameId?: number,
+    scope?: string,
+    _maxDepth?: number,
+  ): Promise<Variable[]> {
+    if (!this.client) throw new Error("Not connected")
+
+    const targetFrameId = frameId ?? this.frameIds[0]
+    if (targetFrameId === undefined) return []
+
+    const scopesResponse = await this.client.sendRequest("scopes", {
+      frameId: targetFrameId,
+    })
+    const scopes = ((scopesResponse.body ?? {}).scopes ?? []) as any[]
+
+    const targetScopes = scope
+      ? scopes.filter((s: any) => s.name.toLowerCase() === scope.toLowerCase())
+      : scopes.filter(
+          (s: any) =>
+            s.name === "Locals" ||
+            s.name === "Local" ||
+            s.name.toLowerCase().includes("local"),
+        )
+
+    const variables: Variable[] = []
+    for (const s of targetScopes.length > 0 ? targetScopes : scopes.slice(0, 1)) {
+      const varsResponse = await this.client.sendRequest("variables", {
+        variablesReference: s.variablesReference,
+      })
+      const vars = ((varsResponse.body ?? {}).variables ?? []) as any[]
+      variables.push(
+        ...vars.map((v: any) => ({
+          name: v.name,
+          value: v.value,
+          type: v.type,
+          variablesReference: v.variablesReference ?? 0,
+        })),
+      )
+    }
+
+    return variables
+  }
+
+  async evaluate(expression: string, frameId?: number): Promise<EvalResult> {
+    if (!this.client) throw new Error("Not connected")
+
+    const targetFrameId = frameId ?? this.frameIds[0]
+    const response = await this.client.sendRequest("evaluate", {
+      expression,
+      frameId: targetFrameId,
+      context: "repl",
+    })
+
+    const body = response.body ?? {}
+    return {
+      result: (body.result as string) ?? "",
+      type: body.type as string | undefined,
+      variablesReference: body.variablesReference as number | undefined,
+    }
+  }
+
+  async disconnect(): Promise<void> {
+    if (this.client) {
+      try {
+        await this.client.sendRequest("disconnect", { terminateDebuggee: true })
+      } catch {
+        // Ignore errors during disconnect
+      }
+      await this.client.disconnect()
+      this.client = null
+    }
+    if (this.process) {
+      this.process.kill()
+      this.process = null
+    }
+  }
+
   onStopped(cb: (event: StoppedInfo) => void): void {
     this.stoppedCallbacks.push(cb)
   }
