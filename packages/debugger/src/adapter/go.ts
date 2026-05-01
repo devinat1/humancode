@@ -316,6 +316,55 @@ export class GoAdapter implements DebugAdapter {
   }
 
   private waitForStop(): Promise<StopResult> {
-    return Promise.resolve({ reason: "entry" })
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        cleanup()
+        reject(new Error("Timed out waiting for debugger to stop"))
+      }, WAIT_TIMEOUT)
+
+      const cleanup = () => {
+        clearTimeout(timer)
+        const idx = this.stoppedCallbacks.indexOf(handler)
+        if (idx >= 0) this.stoppedCallbacks.splice(idx, 1)
+        this.client?.off("terminated", terminatedHandler)
+        this.process?.removeListener("exit", exitHandler)
+      }
+
+      const handler = async (info: StoppedInfo) => {
+        cleanup()
+        try {
+          const frames = await this.getCallStack(info.threadId)
+          const topFrame = frames[0]
+          resolve({
+            reason: info.reason,
+            threadId: info.threadId,
+            location: topFrame
+              ? {
+                  file: topFrame.source?.path,
+                  line: topFrame.line,
+                  column: topFrame.column,
+                  name: topFrame.name,
+                }
+              : undefined,
+          })
+        } catch {
+          resolve({ reason: info.reason, threadId: info.threadId })
+        }
+      }
+
+      const terminatedHandler = () => {
+        cleanup()
+        resolve({ reason: "terminated", terminated: true })
+      }
+
+      const exitHandler = () => {
+        cleanup()
+        resolve({ reason: "terminated", terminated: true })
+      }
+
+      this.stoppedCallbacks.push(handler)
+      this.client?.on("terminated", terminatedHandler)
+      this.process?.once("exit", exitHandler)
+    })
   }
 }
