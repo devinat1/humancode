@@ -1,12 +1,14 @@
 import type { DebugAdapter } from "./base"
 import { NodeAdapter } from "./node"
 import { PythonAdapter } from "./python"
+import { GoAdapter } from "./go"
 
 type AdapterFactory = () => DebugAdapter
 
 const factories = new Map<string, AdapterFactory>([
   ["node", () => new NodeAdapter()],
   ["python", () => new PythonAdapter()],
+  ["go", () => new GoAdapter()],
 ])
 
 export function createAdapter(type: string): DebugAdapter {
@@ -24,6 +26,7 @@ export function createAdapter(type: string): DebugAdapter {
  */
 export function detectType(program: string): string {
   if (program.endsWith(".py")) return "python"
+  if (program.endsWith(".go")) return "go"
   if (
     program.endsWith(".js") ||
     program.endsWith(".ts") ||
@@ -35,6 +38,6 @@ export function detectType(program: string): string {
     return "node"
   }
   throw new Error(
-    `Cannot auto-detect debug type for "${program}". Specify type explicitly ("node" or "python").`,
+    `Cannot auto-detect debug type for "${program}". Specify type explicitly ("node", "python", or "go").`,
   )
 }
