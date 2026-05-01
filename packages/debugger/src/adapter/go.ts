@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "child_process"
+import * as path from "path"
 import type { SourceBreakpoint, StackFrame, Variable } from "../dap/types"
 import type {
   BreakpointResult,
@@ -9,7 +10,7 @@ import type {
   StoppedInfo,
 } from "./base"
 import { DapClient } from "../dap/client"
-import { findFreePort, waitForPort } from "../util/port"
+import { findFreePort } from "../util/port"
 
 /**
  * Decide whether to run dlv in `debug` or `test` mode.
@@ -78,7 +79,7 @@ export class GoAdapter implements DebugAdapter {
 
     this.process = spawn(
       dlvPath,
-      ["dap", "--listen", `127.0.0.1:${port}`],
+      ["dap", "--listen", `127.0.0.1:${port}`, "--check-go-version=false"],
       {
         cwd: config.cwd,
         env: { ...process.env, ...config.env },
@@ -94,13 +95,40 @@ export class GoAdapter implements DebugAdapter {
       console.error(`[go-adapter] Process error: ${err.message}`)
     })
 
+    let stdoutBuffer = ""
+    const ready = new Promise<void>((resolve, reject) => {
+      const onData = (chunk: Buffer) => {
+        stdoutBuffer += chunk.toString()
+        if (stdoutBuffer.includes("DAP server listening at:")) {
+          this.process?.stdout?.off("data", onData)
+          resolve()
+        }
+      }
+      this.process?.stdout?.on("data", onData)
+      const exitHandler = () => {
+        this.process?.stdout?.off("data", onData)
+        reject(new Error("dlv exited before listener was ready"))
+      }
+      this.process?.once("exit", exitHandler)
+      setTimeout(() => {
+        this.process?.stdout?.off("data", onData)
+        reject(new Error("Timed out waiting for dlv listener"))
+      }, 10_000)
+    })
+
     try {
-      await waitForPort(port)
+      await ready
     } catch (err) {
-      const tail = this.stderrBuffer.trim().split("\n").slice(-5).join("\n")
-      throw new Error(
-        `dlv dap failed to start on port ${port}.${tail ? `\nstderr:\n${tail}` : ""}`,
-      )
+      const stderrTail = this.stderrBuffer.trim().split("\n").slice(-5).join("\n")
+      const stdoutTail = stdoutBuffer.trim().split("\n").slice(-5).join("\n")
+      const detail = [
+        err instanceof Error ? err.message : String(err),
+        stdoutTail ? `stdout:\n${stdoutTail}` : "",
+        stderrTail ? `stderr:\n${stderrTail}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n")
+      throw new Error(`dlv dap failed to start on port ${port}.\n${detail}`)
     }
 
     this.client = new DapClient("127.0.0.1", port)
@@ -133,11 +161,17 @@ export class GoAdapter implements DebugAdapter {
       ...(config.testFilter ? ["--", config.testFilter] : []),
     ]
 
+    // dlv test mode requires a package directory, not a .go file.
+    const launchProgram =
+      mode === "test" && config.program.endsWith(".go")
+        ? path.dirname(config.program)
+        : config.program
+
     await this.client.sendRequest("launch", {
       type: "go",
       request: "launch",
       mode,
-      program: config.program,
+      program: launchProgram,
       args: launchArgs,
       cwd: config.cwd ?? process.cwd(),
       env: config.env,
