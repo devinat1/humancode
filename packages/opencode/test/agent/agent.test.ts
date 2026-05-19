@@ -49,6 +49,23 @@ test("explore agent denies edit and write", async () => {
   })
 })
 
+test("socratic agent denies edit, write, patch, and webfetch", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const socratic = await Agent.get("socratic")
+      expect(socratic).toBeDefined()
+      expect(socratic?.mode).toBe("primary")
+      expect(evalPerm(socratic, "edit")).toBe("deny")
+      expect(evalPerm(socratic, "write")).toBe("deny")
+      expect(evalPerm(socratic, "apply_patch")).toBe("deny")
+      expect(evalPerm(socratic, "patch")).toBe("deny")
+      expect(evalPerm(socratic, "webfetch")).toBe("deny")
+    },
+  })
+})
+
 test("explore agent asks for external directories and allows Truncate.GLOB", async () => {
   const { Truncate } = await import("../../src/tool/truncation")
   await using tmp = await tmpdir()

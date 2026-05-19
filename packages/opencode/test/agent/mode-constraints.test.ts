@@ -21,8 +21,9 @@ describe("MODE_CONSTRAINTS", () => {
   })
 
   test("socratic constraint forbids answering for the user", () => {
-    expect(MODE_CONSTRAINTS.socratic).toContain("MUST")
-    expect(MODE_CONSTRAINTS.socratic).toContain("discover")
+    expect(MODE_CONSTRAINTS.socratic).toContain("MUST NOT answer")
+    expect(MODE_CONSTRAINTS.socratic).toContain("one question at a time")
+    expect(MODE_CONSTRAINTS.socratic).toContain("one live breakpoint")
   })
 
   test("vibe constraint requires task parsing and review", () => {
