@@ -4,7 +4,7 @@ import { MODE_CONSTRAINTS } from "../../src/agent/mode-constraints"
 describe("MODE_CONSTRAINTS", () => {
   test("contains exactly the five primary modes", () => {
     const keys = Object.keys(MODE_CONSTRAINTS).sort()
-    expect(keys).toEqual(["adaptive", "claw", "debug", "pair", "vibe"])
+    expect(keys).toEqual(["adaptive", "claw", "pair", "socratic", "vibe"])
   })
 
   test("each constraint is a non-empty string", () => {
@@ -20,9 +20,9 @@ describe("MODE_CONSTRAINTS", () => {
     expect(MODE_CONSTRAINTS.pair).toContain("write/edit")
   })
 
-  test("debug constraint forbids multiple steps", () => {
-    expect(MODE_CONSTRAINTS.debug).toContain("MUST NOT")
-    expect(MODE_CONSTRAINTS.debug).toContain("one logical step")
+  test("socratic constraint forbids answering for the user", () => {
+    expect(MODE_CONSTRAINTS.socratic).toContain("MUST")
+    expect(MODE_CONSTRAINTS.socratic).toContain("discover")
   })
 
   test("vibe constraint requires task parsing and review", () => {
