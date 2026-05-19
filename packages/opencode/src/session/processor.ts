@@ -15,7 +15,7 @@ import { Config } from "@/config/config"
 import { SessionCompaction } from "./compaction"
 import { PermissionNext } from "@/permission/next"
 import { Question } from "@/question"
-import { DebugPhase } from "./debug-phase"
+import { SocraticPhase } from "./socratic-phase"
 
 export namespace SessionProcessor {
   const DOOM_LOOP_THRESHOLD = 3
@@ -137,9 +137,9 @@ export namespace SessionProcessor {
                   if (match) {
                     // Debug agent phase safety net
                     const agent = await Agent.get(input.assistantMessage.agent)
-                    if (DebugPhase.isDebugAgent(agent.name)) {
-                      const phaseState = DebugPhase.get(input.sessionID)
-                      if (phaseState && !DebugPhase.isToolAllowed(phaseState.currentPhase, value.toolName)) {
+                    if (SocraticPhase.isSocraticAgent(agent.name)) {
+                      const phaseState = SocraticPhase.get(input.sessionID)
+                      if (phaseState && !SocraticPhase.isToolAllowed(phaseState.currentPhase, value.toolName)) {
                         await Session.updatePart({
                           ...match,
                           tool: value.toolName,
