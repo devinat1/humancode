@@ -21,7 +21,6 @@ import PROMPT_TITLE from "./prompt/title.txt"
 import PROMPT_VIBE from "./prompt/vibe.txt"
 import { PermissionNext } from "@/permission/next"
 import { mergeDeep, pipe, sortBy, values } from "remeda"
-import { Global } from "@/global"
 import path from "path"
 import { Plugin } from "@/plugin"
 import { Skill } from "../skill"
@@ -113,12 +112,10 @@ export namespace Agent {
         permission: PermissionNext.merge(
           defaults,
           PermissionNext.fromConfig({
-            "*": "deny",
-            read: "allow",
-            glob: "allow",
-            grep: "allow",
-            list: "allow",
-            bash: "allow",
+            edit: "deny",
+            write: "deny",
+            apply_patch: "deny",
+            patch: "deny",
             webfetch: "deny",
           }),
           user,
