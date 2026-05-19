@@ -8,7 +8,7 @@ import ASSESSOR_PROMPT from "./prompt/assessor.txt"
 const log = Log.create({ service: "assessor" })
 
 const ClassifySchema = z.object({
-  mode: z.enum(["pair", "debug", "vibe", "claw"]),
+  mode: z.enum(["pair", "socratic", "vibe", "claw"]),
   confidence: z.number().min(0).max(100),
   reason: z.string(),
 })
@@ -16,7 +16,7 @@ const ClassifySchema = z.object({
 const JSON_SUFFIX = `
 
 Respond with ONLY a JSON object in this exact format, no other text:
-{"mode": "pair|debug|vibe|claw", "confidence": 0-100, "reason": "brief explanation"}`
+{"mode": "pair|socratic|vibe|claw", "confidence": 0-100, "reason": "brief explanation"}`
 
 function parseJSON(text: string): z.infer<typeof ClassifySchema> | undefined {
   const match = text.match(/\{[\s\S]*\}/)
@@ -27,7 +27,7 @@ function parseJSON(text: string): z.infer<typeof ClassifySchema> | undefined {
 
 export namespace Assessor {
   export type Result = {
-    mode: "pair" | "debug" | "vibe" | "claw"
+    mode: "pair" | "socratic" | "vibe" | "claw"
     confidence: number
     reason: string
   }
@@ -87,10 +87,10 @@ export namespace Assessor {
             `Your initial quick assessment was: mode=${result.mode}, confidence=${result.confidence}%, reason="${result.reason}"`,
             "",
             "Think more carefully about what mode fits best given the user's request. Consider:",
-            "- Is this a learning/explanation question? → pair",
+            "- Is this a high-level discussion or trade-off question? → pair",
             "- Is this a simple mechanical task? → claw",
             "- Does this involve multiple steps or features? → vibe",
-            "- Is this complex, risky, or involves debugging? → debug",
+            "- Does the user want to UNDERSTAND code (trace it, debug it, learn how it works)? → socratic",
             JSON_SUFFIX,
           ].join("\n"),
         },

@@ -21,7 +21,7 @@ describe("Assessor", () => {
   })
 
   test("mode must be one of the four concrete modes", () => {
-    const validModes = ["pair", "debug", "vibe", "claw"] as const
+    const validModes = ["pair", "socratic", "vibe", "claw"] as const
     for (const mode of validModes) {
       const result: Assessor.Result = { mode, confidence: 80, reason: "test" }
       expect(validModes).toContain(result.mode)
