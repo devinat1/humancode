@@ -12,7 +12,7 @@ import PROMPT_GENERATE from "./generate.txt"
 import PROMPT_ADAPTIVE from "./prompt/adaptive.txt"
 import PROMPT_CLAW from "./prompt/claw.txt"
 import PROMPT_COMPACTION from "./prompt/compaction.txt"
-import PROMPT_DEBUG from "./prompt/debug.txt"
+import PROMPT_SOCRATIC from "./prompt/socratic.txt"
 import PROMPT_EXPLORE from "./prompt/explore.txt"
 import PROMPT_PAIR from "./prompt/pair.txt"
 import PROMPT_REVIEW from "./prompt/review.txt"
@@ -103,21 +103,22 @@ export namespace Agent {
         mode: "primary",
         native: true,
       },
-      debug: {
-        name: "debug",
-        description: "Step-by-step coding with live debugger walkthroughs",
-        prompt: PROMPT_DEBUG,
+      socratic: {
+        name: "socratic",
+        description: "Guided discovery. One question at a time, one breakpoint at a time. Read-only.",
+        prompt: PROMPT_SOCRATIC,
         temperature: 0.2,
         color: "#E06C75",
         steps: 200,
         permission: PermissionNext.merge(
           defaults,
           PermissionNext.fromConfig({
-            edit: "allow",
-            bash: "allow",
+            "*": "deny",
             read: "allow",
             glob: "allow",
             grep: "allow",
+            list: "allow",
+            bash: "allow",
             webfetch: "deny",
           }),
           user,
@@ -194,46 +195,6 @@ export namespace Agent {
           user,
         ),
         options: {},
-        mode: "primary",
-        native: true,
-      },
-      build: {
-        name: "build",
-        description: "The default agent. Executes tools based on configured permissions.",
-        hidden: true,
-        options: {},
-        permission: PermissionNext.merge(
-          defaults,
-          PermissionNext.fromConfig({
-            question: "allow",
-            plan_enter: "allow",
-          }),
-          user,
-        ),
-        mode: "primary",
-        native: true,
-      },
-      plan: {
-        name: "plan",
-        description: "Plan mode. Disallows all edit tools.",
-        hidden: true,
-        options: {},
-        permission: PermissionNext.merge(
-          defaults,
-          PermissionNext.fromConfig({
-            question: "allow",
-            plan_exit: "allow",
-            external_directory: {
-              [path.join(Global.Path.data, "plans", "*")]: "allow",
-            },
-            edit: {
-              "*": "deny",
-              [path.join(".opencode", "plans", "*.md")]: "allow",
-              [path.relative(Instance.worktree, path.join(Global.Path.data, path.join("plans", "*.md")))]: "allow",
-            },
-          }),
-          user,
-        ),
         mode: "primary",
         native: true,
       },
@@ -399,7 +360,7 @@ export namespace Agent {
     return state().then((x) => x[agent])
   }
 
-  const MODE_ORDER: Record<string, number> = { pair: 0, debug: 1, vibe: 2, claw: 3, adaptive: 4 }
+  const MODE_ORDER: Record<string, number> = { pair: 0, socratic: 1, vibe: 2, claw: 3, adaptive: 4 }
 
   export async function list() {
     const cfg = await Config.get()
@@ -424,7 +385,7 @@ export namespace Agent {
 
     const primary = Object.values(agents).filter((a) => a.mode !== "subagent" && a.hidden !== true)
     if (!primary.length) throw new Error("no primary visible agent found")
-    return primary.find((a) => a.name === "adaptive")?.name ?? primary[0].name
+    return primary.find((a) => a.name === "socratic")?.name ?? primary[0].name
   }
 
   export async function generate(input: { description: string; model?: { providerID: string; modelID: string } }) {
