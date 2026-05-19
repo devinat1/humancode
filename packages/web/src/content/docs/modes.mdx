@@ -10,35 +10,7 @@ Modes are now configured through the `agent` option in the opencode config. The
 
 Modes in opencode allow you to customize the behavior, tools, and prompts for different use cases.
 
-It comes with two built-in modes: **build** and **plan**. You can customize
-these or configure your own through the opencode config.
-
-You can switch between modes during a session or configure them in your config file.
-
----
-
-## Built-in
-
-opencode comes with two built-in modes.
-
----
-
-### Build
-
-Build is the **default** mode with all tools enabled. This is the standard mode for development work where you need full access to file operations and system commands.
-
----
-
-### Plan
-
-A restricted mode designed for planning and analysis. In plan mode, the following tools are disabled by default:
-
-- `write` - Cannot create new files
-- `edit` - Cannot modify existing files, except for files located at `.opencode/plans/*.md` to detail the plan itself
-- `patch` - Cannot apply patches
-- `bash` - Cannot execute shell commands
-
-This mode is useful when you want the AI to analyze code, suggest changes, or create plans without making any actual modifications to your codebase.
+The mode system is now deprecated in favor of [Agents](/docs/agents) — see that page for the current primary agents (Pair, Socratic, Vibe, Claw, Adaptive). The configuration syntax below still works for backward compatibility, but new functionality is added to the agents API.
 
 ---
 
@@ -322,8 +294,7 @@ Priorities:
 
 Here are some common use cases for different modes.
 
-- **Build mode**: Full development work with all tools enabled
-- **Plan mode**: Analysis and planning without making changes
+- **Read-only mode**: Analysis and exploration without making changes
 - **Review mode**: Code review with read-only access plus documentation tools
 - **Debug mode**: Focused on investigation with bash and read tools enabled
 - **Docs mode**: Documentation writing with file operations but no system commands
