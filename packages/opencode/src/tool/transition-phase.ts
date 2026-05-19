@@ -1,23 +1,23 @@
 import z from "zod"
 import { Tool } from "./tool"
-import { DebugPhase } from "../session/debug-phase"
+import { SocraticPhase } from "../session/socratic-phase"
 
 export const TransitionPhaseTool = Tool.define("transitionPhase", {
   description: [
-    "Move to the next phase of the debug workflow.",
-    "Valid phases: PLANNING, CODING, BREAKPOINTING, DEBUGGING, EXPLAINING, CONFIRMING.",
-    "Transitions must follow the sequence: PLANNING -> CODING -> BREAKPOINTING -> DEBUGGING -> EXPLAINING -> CONFIRMING -> PLANNING (next step).",
+    "Move to the next phase of the socratic workflow.",
+    "Valid phases: PLANNING, HYPOTHESIS, SOCRATIC, SUMMARIZING, CONFIRMING.",
+    "Transitions: PLANNING -> HYPOTHESIS|SOCRATIC; HYPOTHESIS -> SOCRATIC; SOCRATIC -> SUMMARIZING; SUMMARIZING -> CONFIRMING; CONFIRMING -> PLANNING (next slice).",
     "Call this when you have completed the work for the current phase.",
   ].join("\n"),
   parameters: z.object({
-    to: z.enum(DebugPhase.PHASES).describe("The phase to transition to"),
+    to: z.enum(SocraticPhase.PHASES).describe("The phase to transition to"),
     reason: z.string().describe("Brief explanation of why you are transitioning"),
   }),
   async execute(args, ctx) {
-    const state = DebugPhase.getOrCreate(ctx.sessionID)
+    const state = SocraticPhase.getOrCreate(ctx.sessionID)
     try {
-      const next = DebugPhase.transition(state, args.to)
-      const allowedTools = DebugPhase.toolsForPhase(next.currentPhase)
+      const next = SocraticPhase.transition(state, args.to)
+      const allowedTools = SocraticPhase.toolsForPhase(next.currentPhase)
       return {
         title: `Phase: ${next.currentPhase}`,
         output: [

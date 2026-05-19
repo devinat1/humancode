@@ -22,7 +22,7 @@ import { SystemPrompt } from "./system"
 import { Flag } from "@/flag/flag"
 import { PermissionNext } from "@/permission/next"
 import { Auth } from "@/auth"
-import { DebugPhase } from "./debug-phase"
+import { SocraticPhase } from "./socratic-phase"
 import { MODE_CONSTRAINTS } from "@/agent/mode-constraints"
 import BASE_OPERATIONS from "@/agent/prompt/base-operations.txt"
 
@@ -287,9 +287,9 @@ export namespace LLM {
     const disabled = PermissionNext.disabled(Object.keys(input.tools), input.agent.permission)
 
     let phaseAllowed: Set<string> | null = null
-    if (DebugPhase.isDebugAgent(input.agent.name)) {
-      const state = DebugPhase.getOrCreate(input.sessionID)
-      const allowed = DebugPhase.toolsForPhase(state.currentPhase)
+    if (SocraticPhase.isSocraticAgent(input.agent.name)) {
+      const state = SocraticPhase.getOrCreate(input.sessionID)
+      const allowed = SocraticPhase.toolsForPhase(state.currentPhase)
       phaseAllowed = new Set(allowed)
     }
 
