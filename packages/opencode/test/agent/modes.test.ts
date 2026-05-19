@@ -5,7 +5,7 @@ import { Agent } from "../../src/agent/agent"
 import { Standards } from "../../src/agent/standards"
 
 describe("multi-mode system", () => {
-  test("all five modes are registered as primary agents", async () => {
+  test("expected primary agents are registered; debug/build/plan are not", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
       directory: tmp.path,
@@ -14,17 +14,18 @@ describe("multi-mode system", () => {
         const visible = agents.filter((a) => a.mode !== "subagent" && a.hidden !== true)
         const names = visible.map((a) => a.name)
         expect(names).toContain("pair")
-        expect(names).toContain("debug")
+        expect(names).toContain("socratic")
         expect(names).toContain("vibe")
         expect(names).toContain("claw")
         expect(names).toContain("adaptive")
+        expect(names).not.toContain("debug")
         expect(names).not.toContain("build")
         expect(names).not.toContain("plan")
       },
     })
   })
 
-  test("Tab cycle order is pair, debug, vibe, claw", async () => {
+  test("Tab cycle order is pair, socratic, vibe, claw, adaptive", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
       directory: tmp.path,
@@ -33,12 +34,25 @@ describe("multi-mode system", () => {
         const visible = agents.filter((a) => a.mode !== "subagent" && a.hidden !== true)
         const names = visible.map((a) => a.name)
         const pairIdx = names.indexOf("pair")
-        const debugIdx = names.indexOf("debug")
+        const socIdx = names.indexOf("socratic")
         const vibeIdx = names.indexOf("vibe")
         const clawIdx = names.indexOf("claw")
-        expect(pairIdx).toBeLessThan(debugIdx)
-        expect(debugIdx).toBeLessThan(vibeIdx)
+        const adaptiveIdx = names.indexOf("adaptive")
+        expect(pairIdx).toBeLessThan(socIdx)
+        expect(socIdx).toBeLessThan(vibeIdx)
         expect(vibeIdx).toBeLessThan(clawIdx)
+        expect(clawIdx).toBeLessThan(adaptiveIdx)
+      },
+    })
+  })
+
+  test("default agent is socratic when no config override", async () => {
+    await using tmp = await tmpdir({ config: {} })
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const def = await Agent.defaultAgent()
+        expect(def).toBe("socratic")
       },
     })
   })
@@ -66,45 +80,33 @@ describe("multi-mode system", () => {
     expect(result).toContain("SOLID Principles")
   })
 
-  test("each mode has distinct color", async () => {
+  test("each primary mode has distinct color", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
       directory: tmp.path,
       fn: async () => {
         const pair = await Agent.get("pair")
-        const debug = await Agent.get("debug")
+        const socratic = await Agent.get("socratic")
         const vibe = await Agent.get("vibe")
         const claw = await Agent.get("claw")
-        const colors = [pair?.color, debug?.color, vibe?.color, claw?.color]
+        const adaptive = await Agent.get("adaptive")
+        const colors = [pair?.color, socratic?.color, vibe?.color, claw?.color, adaptive?.color]
         const unique = new Set(colors)
-        expect(unique.size).toBe(4)
+        expect(unique.size).toBe(5)
       },
     })
   })
 
-  test("adaptive agent is registered as primary", async () => {
+  test("socratic agent is registered as primary", async () => {
     await using tmp = await tmpdir({ config: {} })
     await Instance.provide({
       directory: tmp.path,
       fn: async () => {
-        const agent = await Agent.get("adaptive")
+        const agent = await Agent.get("socratic")
         expect(agent).toBeDefined()
         expect(agent!.mode).toBe("primary")
-        expect(agent!.steps).toBe(500)
-        expect(agent!.color).toBe("#D19A66")
-      },
-    })
-  })
-
-  test("Tab cycle includes adaptive after claw", async () => {
-    await using tmp = await tmpdir({ config: {} })
-    await Instance.provide({
-      directory: tmp.path,
-      fn: async () => {
-        const agents = await Agent.list()
-        const visible = agents.filter((a) => a.mode !== "subagent" && !a.hidden)
-        const names = visible.map((a) => a.name)
-        expect(names.indexOf("adaptive")).toBe(names.indexOf("claw") + 1)
+        expect(agent!.steps).toBe(200)
+        expect(agent!.color).toBe("#E06C75")
       },
     })
   })
@@ -123,17 +125,20 @@ describe("multi-mode system", () => {
     })
   })
 
-  test("debug prompt contains phase workflow and debugger constraints", async () => {
+  test("socratic prompt contains phase workflow and socratic constraints", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
       directory: tmp.path,
       fn: async () => {
-        const debug = await Agent.get("debug")
-        expect(debug?.prompt).toContain("<IDENTITY>")
-        expect(debug?.prompt).toContain("<HARD-CONSTRAINTS>")
-        expect(debug?.prompt).toContain("PLANNING")
-        expect(debug?.prompt).toContain("BREAKPOINTING")
-        expect(debug?.prompt).toContain("NEVER write more than one logical step")
+        const socratic = await Agent.get("socratic")
+        expect(socratic?.prompt).toContain("<IDENTITY>")
+        expect(socratic?.prompt).toContain("<HARD-CONSTRAINTS>")
+        expect(socratic?.prompt).toContain("PLANNING")
+        expect(socratic?.prompt).toContain("HYPOTHESIS")
+        expect(socratic?.prompt).toContain("SOCRATIC")
+        expect(socratic?.prompt).toContain("SUMMARIZING")
+        expect(socratic?.prompt).toContain("one breakpoint")
+        expect(socratic?.prompt).toContain("ONE question")
       },
     })
   })
