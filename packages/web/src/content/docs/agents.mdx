@@ -6,7 +6,7 @@ description: Configure and use specialized agents.
 Agents are specialized AI assistants that can be configured for specific tasks and workflows. They allow you to create focused tools with custom prompts, models, and tool access.
 
 :::tip
-Use the plan agent to analyze code and review suggestions without making any code changes.
+Use the socratic agent to walk through unfamiliar code one breakpoint at a time. It guides you to discover behavior rather than narrating it.
 :::
 
 You can switch between agents during a session or invoke them with the `@` mention.
@@ -21,14 +21,13 @@ There are two types of agents in OpenCode; primary agents and subagents.
 
 ### Primary agents
 
-Primary agents are the main assistants you interact with directly. You can cycle through them using the **Tab** key, or your configured `switch_agent` keybind. These agents handle your main conversation. Tool access is configured via permissions — for example, Build has all tools enabled while Plan is restricted.
+Primary agents are the main assistants you interact with directly. You can cycle through them using the **Tab** key, or your configured `switch_agent` keybind. These agents handle your main conversation. Tool access is configured via permissions — for example, Pair is advice-only with no edit access, while Claw has all tools enabled.
 
 :::tip
 You can use the **Tab** key to switch between primary agents during a session.
 :::
 
-OpenCode comes with two built-in primary agents, **Build** and **Plan**. We'll
-look at these below.
+OpenCode comes with five built-in primary agents: **Pair**, **Socratic**, **Vibe**, **Claw**, and **Adaptive**. We'll look at these below.
 
 ---
 
@@ -36,35 +35,53 @@ look at these below.
 
 Subagents are specialized assistants that primary agents can invoke for specific tasks. You can also manually invoke them by **@ mentioning** them in your messages.
 
-OpenCode comes with two built-in subagents, **General** and **Explore**. We'll look at this below.
+OpenCode comes with three built-in subagents, **General**, **Explore**, and **Review**. We'll look at these below.
 
 ---
 
 ## Built-in
 
-OpenCode comes with two built-in primary agents and two built-in subagents.
+OpenCode comes with five built-in primary agents and three built-in subagents.
 
 ---
 
-### Use build
+### Use pair
 
 _Mode_: `primary`
 
-Build is the **default** primary agent with all tools enabled. This is the standard agent for development work where you need full access to file operations and system commands.
+A pair-programming advisor. Pair never writes or edits code — it suggests approaches, explains trade-offs, and answers questions. Use this when you want to talk through a problem without the agent reaching for the keyboard.
 
 ---
 
-### Use plan
+### Use socratic
 
 _Mode_: `primary`
 
-A restricted agent designed for planning and analysis. We use a permission system to give you more control and prevent unintended changes.
-By default, all of the following are set to `ask`:
+The **default** primary agent. Guides you to discover how code works through one-question-at-a-time Socratic dialog, paired with exactly one live debugger breakpoint per question. Read-only with respect to source code. Use socratic when you want to understand a function, trace why something returns the value it does, or learn how a flow executes — without the agent telling you the answer.
 
-- `file edits`: All writes, patches, and edits
-- `bash`: All bash commands
+---
 
-This agent is useful when you want the LLM to analyze code, suggest changes, or create plans without making any actual modifications to your codebase.
+### Use vibe
+
+_Mode_: `primary`
+
+A multi-task manager. Parses your request into discrete tasks, confirms the plan, then works through each with self-review and a review subagent. Use vibe for moderate multi-step work — new features, multi-file changes, or anything with two or more distinct steps.
+
+---
+
+### Use claw
+
+_Mode_: `primary`
+
+Fully autonomous. No confirmations, self-reviews against quality standards, runs tests. Use claw for straightforward mechanical tasks where the scope is clear — renames, config changes, boilerplate, simple bug fixes.
+
+---
+
+### Use adaptive
+
+_Mode_: `primary`
+
+Adaptive agent that transitions between modes based on task complexity and outcomes. Uses a classifier to decide whether to behave like pair, socratic, vibe, or claw given the current request.
 
 ---
 
@@ -81,6 +98,14 @@ A general-purpose agent for researching complex questions and executing multi-st
 _Mode_: `subagent`
 
 A fast, read-only agent for exploring codebases. Cannot modify files. Use this when you need to quickly find files by patterns, search code for keywords, or answer questions about the codebase.
+
+---
+
+### Use review
+
+_Mode_: `subagent`
+
+Hidden subagent that reviews code against configured quality standards. Invoked by `vibe` and `claw` after task completion, or manually via `@review`.
 
 ---
 
@@ -684,10 +709,10 @@ This interactive command will:
 
 Here are some common use cases for different agents.
 
-- **Build agent**: Full development work with all tools enabled
-- **Plan agent**: Analysis and planning without making changes
-- **Review agent**: Code review with read-only access plus documentation tools
-- **Debug agent**: Focused on investigation with bash and read tools enabled
+- **Socratic agent**: Walk through unfamiliar code, debug tricky behavior, learn how a flow executes
+- **Pair agent**: Discuss approaches and trade-offs before writing any code
+- **Claw agent**: Run mechanical tasks autonomously
+- **Vibe agent**: Multi-step feature work with checkpoints
 - **Docs agent**: Documentation writing with file operations but no system commands
 
 ---
