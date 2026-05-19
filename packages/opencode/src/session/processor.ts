@@ -135,7 +135,7 @@ export namespace SessionProcessor {
                 case "tool-call": {
                   const match = toolcalls[value.toolCallId]
                   if (match) {
-                    // Debug agent phase safety net
+                    // Socratic agent phase safety net
                     const agent = await Agent.get(input.assistantMessage.agent)
                     if (SocraticPhase.isSocraticAgent(agent.name)) {
                       const phaseState = SocraticPhase.get(input.sessionID)
