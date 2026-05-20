@@ -223,11 +223,11 @@ You can create your own custom modes by adding them to the configuration. Here a
 {
   "$schema": "https://opencode.ai/config.json",
   "mode": {
-    "docs": {
-      "prompt": "{file:./prompts/documentation.txt}",
+    "readonly": {
+      "prompt": "{file:./prompts/readonly.txt}",
       "tools": {
-        "write": true,
-        "edit": true,
+        "write": false,
+        "edit": false,
         "bash": false,
         "read": true,
         "grep": true,
