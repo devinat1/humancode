@@ -61,11 +61,16 @@ jobs:
           VERSION=$(node -e "console.log(require('./dist/humancode-darwin-arm64/package.json').version)")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Create GitHub release
+      - name: Create or update GitHub release
         working-directory: packages/opencode
         run: |
-          gh release create "v$VERSION" dist/*.zip dist/*.tar.gz \
-            --title "v$VERSION" --generate-notes
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "Release v$VERSION already exists; uploading assets with --clobber"
+            gh release upload "v$VERSION" dist/*.zip dist/*.tar.gz --clobber
+          else
+            gh release create "v$VERSION" dist/*.zip dist/*.tar.gz \
+              --title "v$VERSION" --generate-notes
+          fi
         env:
           VERSION: ${{ steps.version.outputs.version }}
           GH_TOKEN: ${{ github.token }}
