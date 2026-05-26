@@ -66,13 +66,13 @@ if (!Script.preview) {
     "class Humancode < Formula",
     `  desc "The AI coding agent built for the terminal."`,
     `  homepage "https://github.com/devinat1/humancode"`,
-    `  version "${Script.version.split("-")[0]}"`,
+    `  version "${version.split("-")[0]}"`,
     "",
     `  depends_on "ripgrep"`,
     "",
     "  on_macos do",
     "    if Hardware::CPU.intel?",
-    `      url "https://github.com/devinat1/humancode/releases/download/v${Script.version}/humancode-darwin-x64.zip"`,
+    `      url "https://github.com/devinat1/humancode/releases/download/v${version}/humancode-darwin-x64.zip"`,
     `      sha256 "${macX64Sha}"`,
     "",
     "      def install",
@@ -80,7 +80,7 @@ if (!Script.preview) {
     "      end",
     "    end",
     "    if Hardware::CPU.arm?",
-    `      url "https://github.com/devinat1/humancode/releases/download/v${Script.version}/humancode-darwin-arm64.zip"`,
+    `      url "https://github.com/devinat1/humancode/releases/download/v${version}/humancode-darwin-arm64.zip"`,
     `      sha256 "${macArm64Sha}"`,
     "",
     "      def install",
@@ -91,14 +91,14 @@ if (!Script.preview) {
     "",
     "  on_linux do",
     "    if Hardware::CPU.intel? and Hardware::CPU.is_64_bit?",
-    `      url "https://github.com/devinat1/humancode/releases/download/v${Script.version}/humancode-linux-x64.tar.gz"`,
+    `      url "https://github.com/devinat1/humancode/releases/download/v${version}/humancode-linux-x64.tar.gz"`,
     `      sha256 "${x64Sha}"`,
     "      def install",
     '        bin.install "humancode"',
     "      end",
     "    end",
     "    if Hardware::CPU.arm? and Hardware::CPU.is_64_bit?",
-    `      url "https://github.com/devinat1/humancode/releases/download/v${Script.version}/humancode-linux-arm64.tar.gz"`,
+    `      url "https://github.com/devinat1/humancode/releases/download/v${version}/humancode-linux-arm64.tar.gz"`,
     `      sha256 "${arm64Sha}"`,
     "      def install",
     '        bin.install "humancode"',
@@ -122,6 +122,6 @@ if (!Script.preview) {
   await $`cd ./dist/homebrew-tap && git config user.email "github-actions[bot]@users.noreply.github.com"`
   await Bun.file("./dist/homebrew-tap/humancode.rb").write(homebrewFormula)
   await $`cd ./dist/homebrew-tap && git add humancode.rb`
-  await $`cd ./dist/homebrew-tap && git commit -m "Update to v${Script.version}"`
+  await $`cd ./dist/homebrew-tap && git commit -m "Update to v${version}"`
   await $`cd ./dist/homebrew-tap && git push`
 }
