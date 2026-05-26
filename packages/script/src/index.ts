@@ -33,13 +33,25 @@ const IS_PREVIEW = CHANNEL !== "latest"
 const VERSION = await (async () => {
   if (env.OPENCODE_VERSION) return env.OPENCODE_VERSION
   if (IS_PREVIEW) return `0.0.0-${CHANNEL}-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}`
-  const version = await fetch("https://registry.npmjs.org/humancode/latest")
-    .then((res) => {
-      if (!res.ok) return { version: "0.0.0" }
-      return res.json()
-    })
-    .then((data: any) => data.version)
-  const [major, minor, patch] = version.split(".").map((x: string) => Number(x) || 0)
+  const npmVersion = await fetch("https://registry.npmjs.org/humancode/latest")
+    .then((res) => (res.ok ? res.json() : { version: "0.0.0" }))
+    .then((data: any) => data.version as string)
+  const ghVersion = await fetch("https://api.github.com/repos/devinat1/humancode/releases/latest")
+    .then((res) => (res.ok ? res.json() : { tag_name: "v0.0.0" }))
+    .then((data: any) => ((data.tag_name as string) || "v0.0.0").replace(/^v/, ""))
+  // Take the max so we never re-pick a version that's already a GitHub release
+  // (e.g. when a previous publish failed mid-flight after the release was cut).
+  const pick = (a: string, b: string): string => {
+    const av = a.split(".").map((x) => Number(x) || 0)
+    const bv = b.split(".").map((x) => Number(x) || 0)
+    for (let i = 0; i < 3; i++) {
+      if ((av[i] || 0) > (bv[i] || 0)) return a
+      if ((av[i] || 0) < (bv[i] || 0)) return b
+    }
+    return a
+  }
+  const baseline = pick(npmVersion, ghVersion)
+  const [major, minor, patch] = baseline.split(".").map((x: string) => Number(x) || 0)
   const t = env.OPENCODE_BUMP?.toLowerCase()
   if (t === "major") return `${major + 1}.0.0`
   if (t === "minor") return `${major}.${minor + 1}.0`
