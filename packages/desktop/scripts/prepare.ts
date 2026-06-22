@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
 import { $ } from "bun"
-
 import { Script } from "@opencode-ai/script"
 import { copyBinaryToSidecarFolder, getCurrentSidecar, windowsify } from "./utils"
+
+await import("./prebuild")
 
 const pkg = await Bun.file("./package.json").json()
 pkg.version = Script.version
