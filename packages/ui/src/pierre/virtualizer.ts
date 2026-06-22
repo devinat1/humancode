@@ -16,7 +16,7 @@ const cache = new WeakMap<Document | HTMLElement, Entry>()
 export const virtualMetrics: Partial<VirtualFileMetrics> = {
   lineHeight: 24,
   hunkSeparatorHeight: 24,
-  fileGap: 0,
+  spacing: 0,
 }
 
 function scrollable(value: string) {
@@ -37,10 +37,11 @@ function target(container: HTMLElement): Target | undefined {
 
   const review = container.closest("[data-component='session-review']")
   if (review instanceof HTMLElement) {
+    const root = scrollRoot(container) ?? review
     const content = review.querySelector("[data-slot='session-review-container']")
     return {
       key: review,
-      root: review,
+      root,
       content: content instanceof HTMLElement ? content : undefined,
     }
   }

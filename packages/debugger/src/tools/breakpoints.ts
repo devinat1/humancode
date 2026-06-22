@@ -1,5 +1,6 @@
 import { z } from "zod"
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import type { ZodRawShapeCompat } from "@modelcontextprotocol/sdk/server/zod-compat.js"
 import * as SessionManager from "../session/manager"
 import {
   getBreakpointsForFile,
@@ -10,33 +11,46 @@ import {
 } from "../session/state"
 
 export function registerBreakpointTools(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "set_breakpoints",
-    "Set breakpoints in a source file. Merges with existing breakpoints for the file.",
     {
-      file: z.string().describe("Absolute path to the source file"),
-      breakpoints: z
-        .array(
-          z.object({
-            line: z.number().describe("Line number (1-based)"),
-            column: z.number().optional().describe("Column number (1-based)"),
-            condition: z
-              .string()
-              .optional()
-              .describe("Conditional expression for the breakpoint"),
-            hitCondition: z
-              .string()
-              .optional()
-              .describe("Hit count condition"),
-            logMessage: z
-              .string()
-              .optional()
-              .describe("Log message (logpoint) instead of breaking"),
-          }),
-        )
-        .describe("Breakpoints to set"),
+      description:
+        "Set breakpoints in a source file. Merges with existing breakpoints for the file.",
+      inputSchema: {
+        file: z.string().describe("Absolute path to the source file"),
+        breakpoints: z
+          .array(
+            z.object({
+              line: z.number().describe("Line number (1-based)"),
+              column: z.number().optional().describe("Column number (1-based)"),
+              condition: z
+                .string()
+                .optional()
+                .describe("Conditional expression for the breakpoint"),
+              hitCondition: z
+                .string()
+                .optional()
+                .describe("Hit count condition"),
+              logMessage: z
+                .string()
+                .optional()
+                .describe("Log message (logpoint) instead of breaking"),
+            }),
+          )
+          .describe("Breakpoints to set"),
+      } as unknown as ZodRawShapeCompat,
     },
-    async ({ file, breakpoints }) => {
+    async (args) => {
+      const { file, breakpoints } = args as {
+        file: string
+        breakpoints: Array<{
+          line: number
+          column?: number
+          condition?: string
+          hitCondition?: string
+          logMessage?: string
+        }>
+      }
       const session = SessionManager.requireActive()
 
       // Merge with existing breakpoints
@@ -88,17 +102,21 @@ export function registerBreakpointTools(server: McpServer): void {
     },
   )
 
-  server.tool(
+  server.registerTool(
     "remove_breakpoints",
-    "Remove breakpoints from a source file. If lines are specified, only those lines are removed. Otherwise all breakpoints in the file are removed.",
     {
-      file: z.string().describe("Absolute path to the source file"),
-      lines: z
-        .array(z.number())
-        .optional()
-        .describe("Specific line numbers to remove. Omit to remove all."),
+      description:
+        "Remove breakpoints from a source file. If lines are specified, only those lines are removed. Otherwise all breakpoints in the file are removed.",
+      inputSchema: {
+        file: z.string().describe("Absolute path to the source file"),
+        lines: z
+          .array(z.number())
+          .optional()
+          .describe("Specific line numbers to remove. Omit to remove all."),
+      } as unknown as ZodRawShapeCompat,
     },
-    async ({ file, lines }) => {
+    async (args) => {
+      const { file, lines } = args as { file: string; lines?: number[] }
       const session = SessionManager.requireActive()
 
       const existing = getBreakpointsForFile(session, file)
@@ -138,10 +156,13 @@ export function registerBreakpointTools(server: McpServer): void {
     },
   )
 
-  server.tool(
+  server.registerTool(
     "list_breakpoints",
-    "List all breakpoints across all files in the active debug session.",
-    {},
+    {
+      description:
+        "List all breakpoints across all files in the active debug session.",
+      inputSchema: {},
+    },
     async () => {
       const session = SessionManager.requireActive()
       const all = getAllBreakpoints(session)
