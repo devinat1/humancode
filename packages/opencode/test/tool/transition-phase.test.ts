@@ -7,13 +7,14 @@ import { Agent } from "../../src/agent/agent"
 import { testInstanceStoreLayer } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 import type { Tool } from "../../src/tool/tool"
+import { MessageID, SessionID } from "../../src/session/schema"
 
 const toolLayer = Layer.mergeAll(Truncate.defaultLayer, Agent.defaultLayer, testInstanceStoreLayer)
 const it = testEffect(toolLayer)
 
 const ctx: Tool.Context = {
-  sessionID: "test-session",
-  messageID: "msg-1",
+  sessionID: SessionID.make("test-session"),
+  messageID: MessageID.make("msg-1"),
   agent: "socratic",
   abort: AbortSignal.any([]),
   callID: "call-1",

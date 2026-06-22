@@ -20,7 +20,7 @@ export const TransitionPhaseTool = Tool.define(
         "Call this when you have completed the work for the current phase.",
       ].join("\n"),
       parameters: Parameters,
-      execute: (args, ctx) =>
+      execute: (args: { to: (typeof SocraticPhase.PHASES)[number]; reason: string }, ctx) =>
         Effect.sync(() => {
           const state = SocraticPhase.getOrCreate(ctx.sessionID)
           try {
