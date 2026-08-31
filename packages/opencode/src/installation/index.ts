@@ -63,7 +63,6 @@ export class UpgradeFailedError extends Schema.TaggedErrorClass<UpgradeFailedErr
 // Response schemas for external version APIs
 const GitHubRelease = Schema.Struct({ tag_name: Schema.String })
 const NpmPackage = Schema.Struct({ version: Schema.String })
-const BrewFormula = Schema.Struct({ versions: Schema.Struct({ stable: Schema.String }) })
 const BrewInfoV2 = Schema.Struct({
   formulae: Schema.Array(Schema.Struct({ versions: Schema.Struct({ stable: Schema.String }) })),
 })
@@ -123,11 +122,11 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
     )
 
     const getBrewFormula = Effect.fnUntraced(function* () {
-      const tapFormula = yield* text(["brew", "list", "--formula", "anomalyco/tap/opencode"])
-      if (tapFormula.includes("opencode")) return "anomalyco/tap/opencode"
-      const coreFormula = yield* text(["brew", "list", "--formula", "opencode"])
-      if (coreFormula.includes("opencode")) return "opencode"
-      return "opencode"
+      const tapFormula = yield* text(["brew", "list", "--formula", "devinat1/tap/humancode"])
+      if (tapFormula.includes("humancode")) return "devinat1/tap/humancode"
+      const coreFormula = yield* text(["brew", "list", "--formula", "humancode"])
+      if (coreFormula.includes("humancode")) return "humancode"
+      return "humancode"
     })
 
     const upgradeFailure = (method: Method, result?: { code: number; stdout: string; stderr: string }) => {
@@ -181,7 +180,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
           { name: "yarn", command: () => text(["yarn", "global", "list"]) },
           { name: "pnpm", command: () => text(["pnpm", "list", "-g", "--depth=0"]) },
           { name: "bun", command: () => text(["bun", "pm", "ls", "-g"]) },
-          { name: "brew", command: () => text(["brew", "list", "--formula", "opencode"]) },
+          { name: "brew", command: () => text(["brew", "list", "--formula", "humancode"]) },
           { name: "scoop", command: () => text(["scoop", "list", "opencode"]) },
           { name: "choco", command: () => text(["choco", "list", "--limit-output", "opencode"]) },
         ]
@@ -196,11 +195,15 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
 
         for (const check of checks) {
           const output = yield* check.command()
-          const installedName =
-            check.name === "brew" || check.name === "choco" || check.name === "scoop" ? "opencode" : "opencode-ai"
-          if (output.includes(installedName)) {
-            return check.name
+          if (check.name === "brew") {
+            if (output.includes("humancode")) return check.name
+            continue
           }
+          if (check.name === "choco" || check.name === "scoop") {
+            if (output.includes("opencode")) return check.name
+            continue
+          }
+          if (output.includes("opencode-ai")) return check.name
         }
 
         return "unknown" as Method
@@ -210,18 +213,9 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
 
         if (detectedMethod === "brew") {
           const formula = yield* getBrewFormula()
-          if (formula.includes("/")) {
-            const infoJson = yield* text(["brew", "info", "--json=v2", formula])
-            const info = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(BrewInfoV2))(infoJson)
-            return info.formulae[0].versions.stable
-          }
-          const response = yield* httpOk.execute(
-            HttpClientRequest.get("https://formulae.brew.sh/api/formula/opencode.json").pipe(
-              HttpClientRequest.acceptJson,
-            ),
-          )
-          const data = yield* HttpClientResponse.schemaBodyJson(BrewFormula)(response)
-          return data.versions.stable
+          const infoJson = yield* text(["brew", "info", "--json=v2", formula])
+          const info = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(BrewInfoV2))(infoJson)
+          return info.formulae[0].versions.stable
         }
 
         if (detectedMethod === "npm" || detectedMethod === "bun" || detectedMethod === "pnpm") {
@@ -255,7 +249,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
         }
 
         const response = yield* httpOk.execute(
-          HttpClientRequest.get("https://api.github.com/repos/anomalyco/opencode/releases/latest").pipe(
+          HttpClientRequest.get("https://api.github.com/repos/devinat1/humancode/releases/latest").pipe(
             HttpClientRequest.acceptJson,
           ),
         )
@@ -281,12 +275,12 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
             const formula = yield* getBrewFormula()
             const env = { HOMEBREW_NO_AUTO_UPDATE: "1" }
             if (formula.includes("/")) {
-              const tap = yield* run(["brew", "tap", "anomalyco/tap"], { env })
+              const tap = yield* run(["brew", "tap", "devinat1/tap"], { env })
               if (tap.code !== 0) {
                 upgradeResult = tap
                 break
               }
-              const repo = yield* text(["brew", "--repo", "anomalyco/tap"])
+              const repo = yield* text(["brew", "--repo", "devinat1/tap"])
               const dir = repo.trim()
               if (dir) {
                 const pull = yield* run(["git", "pull", "--ff-only"], { cwd: dir, env })
