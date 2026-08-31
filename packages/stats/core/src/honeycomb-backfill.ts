@@ -3,7 +3,7 @@ import { readdir } from "node:fs/promises"
 import path from "node:path"
 import { drizzle } from "drizzle-orm/planetscale-serverless"
 import { geoStat, modelStat, providerStat } from "./database/schema"
-import { statModel, statProvider } from "./domain/model-normalization"
+import { FREE_MODELS, statModel, statProvider } from "./domain/model-normalization"
 import {
   chunks,
   collapseRows,
@@ -25,7 +25,6 @@ import {
 const DAY_MS = 86_400_000
 const DEFAULT_UPSERT_CHUNK_SIZE = 100
 const DEFAULT_TIERS = ["Go", "Free", "Paid"]
-const FREE_MODELS = new Set(["gpt-5-nano", "grok-code", "big-pickle"])
 
 type Grain = "day" | "week"
 type MetricDimension = "model" | "provider" | "geo" | "geo-model"
@@ -454,7 +453,11 @@ function baseAggregate(row: RawRow, grain: Grain, opts: ImportOptions): StatBase
     tier: tier(row),
     sessions: integer(row, "sessions", ["COUNT_DISTINCT(session)"]),
     requests: integer(row, "requests", ["COUNT", "COUNT()"]),
-    unique_users: integer(row, "unique_users", ["COUNT_DISTINCT(workspace)", "COUNT_DISTINCT(api_key)"]),
+    unique_users: integer(row, "unique_users", [
+      "COUNT_DISTINCT(user_id)",
+      "COUNT_DISTINCT(workspace)",
+      "COUNT_DISTINCT(api_key)",
+    ]),
     input_tokens: integer(row, "input_tokens", ["SUM(tokens.input)", "SUM(tokens_input)"]),
     output_tokens: integer(row, "output_tokens", ["SUM(tokens.output)", "SUM(tokens_output)"]),
     reasoning_tokens: integer(row, "reasoning_tokens", ["SUM(tokens.reasoning)", "SUM(tokens_reasoning)"]),
