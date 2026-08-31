@@ -26,15 +26,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: oven-sh/setup-bun@v2
-
+      # Node 24: node-gyp@latest (via tree-sitter-powershell) pulls undici 8,
+      # which needs markAsUncloneable (Node >= 22.10). Node 20 fails bun install.
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Install dependencies
-        run: bun install
+      - uses: ./.github/actions/setup-bun
 
       - name: Build all platforms
         run: bun run build
