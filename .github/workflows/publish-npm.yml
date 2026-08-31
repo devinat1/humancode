@@ -74,10 +74,18 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           GH_TOKEN: ${{ github.token }}
 
+      - name: Setup Homebrew tap SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$HOMEBREW_TAP_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+        env:
+          HOMEBREW_TAP_SSH_KEY: ${{ secrets.HOMEBREW_TAP_SSH_KEY }}
+
       - name: Publish npm + update Homebrew tap
         working-directory: packages/opencode
         run: ./script/publish.ts
         env:
           OPENCODE_BUMP: ${{ inputs.bump || 'patch' }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

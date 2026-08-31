@@ -110,12 +110,7 @@ if (!Script.preview) {
     "",
   ].join("\n")
 
-  const token = process.env.GITHUB_TOKEN
-  if (!token) {
-    console.error("GITHUB_TOKEN is required to update homebrew tap")
-    process.exit(1)
-  }
-  const tap = `https://x-access-token:${token}@github.com/devinat1/homebrew-tap.git`
+  const tap = "git@github.com:devinat1/homebrew-tap.git"
   await $`rm -rf ./dist/homebrew-tap`
   await $`git clone ${tap} ./dist/homebrew-tap`
   await $`cd ./dist/homebrew-tap && git config user.name "github-actions[bot]"`
