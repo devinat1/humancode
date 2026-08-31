@@ -1,5 +1,6 @@
 import { describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { TransitionPhaseTool } from "../../src/tool/transition-phase"
 import { SocraticPhase } from "../../src/session/socratic-phase"
 import { Truncate } from "../../src/tool/truncate"
@@ -9,11 +10,14 @@ import { testEffect } from "../lib/effect"
 import type { Tool } from "../../src/tool/tool"
 import { MessageID, SessionID } from "../../src/session/schema"
 
-const toolLayer = Layer.mergeAll(Truncate.defaultLayer, Agent.defaultLayer, testInstanceStoreLayer)
+const toolLayer = Layer.mergeAll(
+  LayerNode.compile(LayerNode.group([Truncate.node, Agent.node])),
+  testInstanceStoreLayer,
+)
 const it = testEffect(toolLayer)
 
 const ctx: Tool.Context = {
-  sessionID: SessionID.make("test-session"),
+  sessionID: SessionID.make("ses_test-session"),
   messageID: MessageID.make("msg-1"),
   agent: "socratic",
   abort: AbortSignal.any([]),
@@ -26,8 +30,8 @@ const ctx: Tool.Context = {
 describe("tool.transitionPhase", () => {
   it.instance("successful transition from PLANNING to HYPOTHESIS", () =>
     Effect.gen(function* () {
-      SocraticPhase.clear("test-session")
-      SocraticPhase.create("test-session")
+      SocraticPhase.clear("ses_test-session")
+      SocraticPhase.create("ses_test-session")
       const tool = yield* TransitionPhaseTool
       const def = yield* tool.init()
       const result = yield* def.execute({ to: "HYPOTHESIS", reason: "User has not stated hypothesis" }, ctx)
@@ -42,8 +46,8 @@ describe("tool.transitionPhase", () => {
 
   it.instance("successful transition from PLANNING to SOCRATIC (skipping HYPOTHESIS)", () =>
     Effect.gen(function* () {
-      SocraticPhase.clear("test-session")
-      SocraticPhase.create("test-session")
+      SocraticPhase.clear("ses_test-session")
+      SocraticPhase.create("ses_test-session")
       const tool = yield* TransitionPhaseTool
       const def = yield* tool.init()
       const result = yield* def.execute({ to: "SOCRATIC", reason: "User already stated a specific question" }, ctx)
@@ -55,8 +59,8 @@ describe("tool.transitionPhase", () => {
 
   it.instance("failed transition from PLANNING to SUMMARIZING", () =>
     Effect.gen(function* () {
-      SocraticPhase.clear("test-session")
-      SocraticPhase.create("test-session")
+      SocraticPhase.clear("ses_test-session")
+      SocraticPhase.create("ses_test-session")
       const tool = yield* TransitionPhaseTool
       const def = yield* tool.init()
       const result = yield* def.execute({ to: "SUMMARIZING", reason: "Skip ahead" }, ctx)
@@ -71,8 +75,8 @@ describe("tool.transitionPhase", () => {
 
   it.instance("parameter 'to' must be a valid phase name", () =>
     Effect.gen(function* () {
-      SocraticPhase.clear("test-session")
-      SocraticPhase.create("test-session")
+      SocraticPhase.clear("ses_test-session")
+      SocraticPhase.create("ses_test-session")
       const tool = yield* TransitionPhaseTool
       const def = yield* tool.init()
       const exit = yield* def
@@ -84,8 +88,8 @@ describe("tool.transitionPhase", () => {
 
   it.instance("step increments when cycling from CONFIRMING back to PLANNING", () =>
     Effect.gen(function* () {
-      SocraticPhase.clear("test-session")
-      SocraticPhase.create("test-session")
+      SocraticPhase.clear("ses_test-session")
+      SocraticPhase.create("ses_test-session")
       const tool = yield* TransitionPhaseTool
       const def = yield* tool.init()
       yield* def.execute({ to: "SOCRATIC", reason: "step 1" }, ctx)
@@ -100,8 +104,8 @@ describe("tool.transitionPhase", () => {
 
   it.instance("output includes available tools for the new phase", () =>
     Effect.gen(function* () {
-      SocraticPhase.clear("test-session")
-      SocraticPhase.create("test-session")
+      SocraticPhase.clear("ses_test-session")
+      SocraticPhase.create("ses_test-session")
       const tool = yield* TransitionPhaseTool
       const def = yield* tool.init()
       const result = yield* def.execute({ to: "SOCRATIC", reason: "begin loop" }, ctx)
