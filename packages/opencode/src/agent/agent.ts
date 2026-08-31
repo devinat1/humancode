@@ -10,10 +10,16 @@ import { Auth } from "../auth"
 import { ProviderTransform } from "@/provider/transform"
 
 import PROMPT_GENERATE from "./generate.txt"
+import PROMPT_ADAPTIVE from "./prompt/adaptive.txt"
+import PROMPT_CLAW from "./prompt/claw.txt"
 import PROMPT_COMPACTION from "./prompt/compaction.txt"
 import PROMPT_EXPLORE from "./prompt/explore.txt"
+import PROMPT_PAIR from "./prompt/pair.txt"
+import PROMPT_REVIEW from "./prompt/review.txt"
+import PROMPT_SOCRATIC from "./prompt/socratic.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
+import PROMPT_VIBE from "./prompt/vibe.txt"
 import { Permission } from "@/permission"
 import { mergeDeep, pipe, sortBy, values } from "remeda"
 import { Global } from "@opencode-ai/core/global"
@@ -138,10 +144,127 @@ const layer = Layer.effect(
         const user = Permission.fromConfig(cfg.permission ?? {})
 
         const agents: Record<string, Info> = {
+          pair: {
+            name: "pair",
+            description: "Pair programming partner. Suggests approaches and explains trade-offs. Never writes code.",
+            prompt: PROMPT_PAIR,
+            temperature: 0.4,
+            color: "#61AFEF",
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "deny",
+                grep: "allow",
+                glob: "allow",
+                list: "allow",
+                read: "allow",
+                websearch: "allow",
+                webfetch: "allow",
+              }),
+              user,
+            ),
+            options: {},
+            mode: "primary",
+            native: true,
+          },
+          socratic: {
+            name: "socratic",
+            description: "Guided discovery. One question at a time, one breakpoint at a time. Read-only.",
+            prompt: PROMPT_SOCRATIC,
+            temperature: 0.2,
+            color: "#E06C75",
+            steps: 200,
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                edit: "deny",
+                write: "deny",
+                apply_patch: "deny",
+                patch: "deny",
+                webfetch: "deny",
+              }),
+              user,
+            ),
+            options: {},
+            mode: "primary",
+            native: true,
+          },
+          vibe: {
+            name: "vibe",
+            description: "Multi-task manager. Queues tasks, works through them with self-review, presents results.",
+            prompt: PROMPT_VIBE,
+            temperature: 0.3,
+            color: "#98C379",
+            steps: 100,
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                question: "allow",
+                plan_enter: "allow",
+              }),
+              user,
+            ),
+            options: {},
+            mode: "primary",
+            native: true,
+          },
+          claw: {
+            name: "claw",
+            description: "Fully autonomous agent. Single prompt, self-reviews against quality standards.",
+            prompt: PROMPT_CLAW,
+            temperature: 0.2,
+            color: "#C678DD",
+            steps: 500,
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "allow",
+                question: "allow",
+                plan_enter: "allow",
+                read: {
+                  "*": "allow",
+                  "*.env": "ask",
+                  "*.env.*": "ask",
+                  "*.env.example": "allow",
+                },
+              }),
+              user,
+            ),
+            options: {},
+            mode: "primary",
+            native: true,
+          },
+          adaptive: {
+            name: "adaptive",
+            description: "Adaptive agent that transitions between modes based on task complexity and outcomes.",
+            prompt: PROMPT_ADAPTIVE,
+            temperature: 0.3,
+            color: "#D19A66",
+            steps: 500,
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "allow",
+                question: "allow",
+                plan_enter: "allow",
+                read: {
+                  "*": "allow",
+                  "*.env": "ask",
+                  "*.env.*": "ask",
+                  "*.env.example": "allow",
+                },
+              }),
+              user,
+            ),
+            options: {},
+            mode: "primary",
+            native: true,
+          },
           build: {
             name: "build",
             description: "The default agent. Executes tools based on configured permissions.",
             options: {},
+            hidden: true,
             permission: Permission.merge(
               defaults,
               Permission.fromConfig({
@@ -157,6 +280,7 @@ const layer = Layer.effect(
             name: "plan",
             description: "Plan mode. Disallows all edit tools.",
             options: {},
+            hidden: true,
             permission: Permission.merge(
               defaults,
               Permission.fromConfig({
@@ -262,6 +386,26 @@ const layer = Layer.effect(
             ),
             prompt: PROMPT_SUMMARY,
           },
+          review: {
+            name: "review",
+            mode: "subagent",
+            options: {},
+            native: true,
+            hidden: true,
+            temperature: 0.1,
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "deny",
+                grep: "allow",
+                glob: "allow",
+                list: "allow",
+                read: "allow",
+              }),
+              user,
+            ),
+            prompt: PROMPT_REVIEW,
+          },
         }
 
         for (const [key, value] of Object.entries(cfg.agent ?? {})) {
@@ -319,7 +463,7 @@ const layer = Layer.effect(
             agents,
             values(),
             sortBy(
-              [(x) => (cfg.default_agent ? x.name === cfg.default_agent : x.name === "build"), "desc"],
+              [(x) => (cfg.default_agent ? x.name === cfg.default_agent : x.name === "adaptive"), "desc"],
               [(x) => x.name, "asc"],
             ),
           )
@@ -334,6 +478,8 @@ const layer = Layer.effect(
             if (agent.hidden === true) throw new Error(`default agent "${c.default_agent}" is hidden`)
             return agent
           }
+          const adaptive = agents.adaptive
+          if (adaptive && adaptive.mode !== "subagent" && adaptive.hidden !== true) return adaptive
           const visible = Object.values(agents).find((a) => a.mode !== "subagent" && a.hidden !== true)
           if (!visible) throw new Error("no primary visible agent found")
           return visible
