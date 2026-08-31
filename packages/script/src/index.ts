@@ -1,6 +1,7 @@
 import { $ } from "bun"
 import semver from "semver"
 import path from "path"
+import { maxVersion, nextReleaseVersion } from "./version"
 
 const rootPkgPath = path.resolve(import.meta.dir, "../../../package.json")
 const rootPkg = await Bun.file(rootPkgPath).json()
@@ -36,27 +37,16 @@ const VERSION = await (async () => {
   if (IS_PREVIEW) return `0.0.0-${CHANNEL}-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}`
   const npmVersion = await fetch("https://registry.npmjs.org/humancode/latest")
     .then((res) => (res.ok ? res.json() : { version: "0.0.0" }))
-    .then((data: any) => data.version as string)
+    .then((data) => stringField(data, "version") ?? "0.0.0")
   const ghVersion = await fetch("https://api.github.com/repos/devinat1/humancode/releases/latest")
     .then((res) => (res.ok ? res.json() : { tag_name: "v0.0.0" }))
-    .then((data: any) => ((data.tag_name as string) || "v0.0.0").replace(/^v/, ""))
-  // Take the max so we never re-pick a version that's already a GitHub release
-  // (e.g. when a previous publish failed mid-flight after the release was cut).
-  const pick = (a: string, b: string): string => {
-    const av = a.split(".").map((x) => Number(x) || 0)
-    const bv = b.split(".").map((x) => Number(x) || 0)
-    for (let i = 0; i < 3; i++) {
-      if ((av[i] || 0) > (bv[i] || 0)) return a
-      if ((av[i] || 0) < (bv[i] || 0)) return b
-    }
-    return a
-  }
-  const baseline = pick(npmVersion, ghVersion)
-  const [major, minor, patch] = baseline.split(".").map((x: string) => Number(x) || 0)
-  const t = env.OPENCODE_BUMP?.toLowerCase()
-  if (t === "major") return `${major + 1}.0.0`
-  if (t === "minor") return `${major}.${minor + 1}.0`
-  return `${major}.${minor}.${patch + 1}`
+    .then((data) => (stringField(data, "tag_name") ?? "v0.0.0").replace(/^v/, ""))
+  const cliPkg: unknown = await Bun.file(path.resolve(import.meta.dir, "../../opencode/package.json")).json()
+  return nextReleaseVersion({
+    published: maxVersion(npmVersion, ghVersion),
+    source: stringField(cliPkg, "version") ?? "0.0.0",
+    bump: env.OPENCODE_BUMP,
+  })
 })()
 
 const bot = ["actions-user", "opencode", "opencode-agent[bot]"]
@@ -87,3 +77,9 @@ export const Script = {
   },
 }
 console.log(`opencode script`, JSON.stringify(Script, null, 2))
+
+function stringField(data: unknown, key: string) {
+  if (!data || typeof data !== "object") return
+  const value = Object.getOwnPropertyDescriptor(data, key)?.value
+  if (typeof value === "string") return value
+}
