@@ -887,7 +887,7 @@ export const dict = {
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
 
-  "app.name.desktop": "HumanCode Desktop",
+  "app.name.desktop": "OpenCode Desktop",
 
   "settings.section.desktop": "Desktop",
   "settings.section.server": "Server",

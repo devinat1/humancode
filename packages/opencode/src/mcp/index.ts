@@ -34,8 +34,6 @@ import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { McpCatalog } from "./catalog"
 import { McpEvent } from "@opencode-ai/schema/mcp-event"
 import { McpBrowser } from "./browser"
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js"
-import { createServer as createDebuggerServer } from "@opencode-ai/debugger/server"
 
 const DEFAULT_TIMEOUT = 30_000
 const CLIENT_OPTIONS = {
@@ -502,37 +500,6 @@ const layer = Layer.effect(
           clients: {},
           defs: {},
           instructions: {},
-        }
-
-        if (!("debugger" in config)) {
-          const directory = yield* InstanceState.directory
-          const result = yield* Effect.tryPromise({
-            try: async () => {
-              const debuggerServer = createDebuggerServer()
-              const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
-              await debuggerServer.connect(serverTransport)
-              const client = createClient(directory)
-              await client.connect(clientTransport)
-              return { mcpClient: client, status: { status: "connected" } as Status }
-            },
-            catch: (error) => (error instanceof Error ? error : new Error(String(error))),
-          }).pipe(
-            Effect.catch((error) =>
-              Effect.succeed({
-                mcpClient: undefined,
-                status: {
-                  status: "failed" as const,
-                  error: error.message,
-                },
-              }),
-            ),
-          )
-          s.status.debugger = result.status
-          if (result.mcpClient) {
-            s.clients.debugger = result.mcpClient
-            s.defs.debugger = []
-            watch(s, "debugger", result.mcpClient, bridge)
-          }
         }
 
         yield* Effect.forEach(

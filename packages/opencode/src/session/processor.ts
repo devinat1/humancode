@@ -20,7 +20,6 @@ import { SessionStatus } from "./status"
 import { SessionSummary } from "./summary"
 import type { Provider } from "@/provider/provider"
 import { Question } from "@/question"
-import { SocraticPhase } from "./socratic-phase"
 import { errorMessage } from "@/util/error"
 import { isRecord } from "@/util/record"
 import { EventV2Bridge } from "@/event-v2-bridge"
@@ -335,24 +334,6 @@ const layer = Layer.effect(
             }
             yield* ensureToolCall(value)
             const input = isRecord(value.input) ? value.input : { value: value.input }
-            const agent = yield* agents.get(ctx.assistantMessage.agent)
-            if (SocraticPhase.isSocraticAgent(agent.name)) {
-              const phaseState = SocraticPhase.get(ctx.sessionID)
-              if (phaseState && !SocraticPhase.isToolAllowed(phaseState.currentPhase, value.name)) {
-                yield* updateToolCall(value.id, (match) => ({
-                  ...match,
-                  tool: value.name,
-                  state: {
-                    status: "error",
-                    input,
-                    error: `Tool "${value.name}" is not available in the ${phaseState.currentPhase} phase. Use transitionPhase to move to the correct phase first.`,
-                    time: { start: Date.now(), end: Date.now() },
-                  },
-                }))
-                delete ctx.toolcalls[value.id]
-                return
-              }
-            }
             yield* updateToolCall(value.id, (match) => ({
               ...match,
               tool: value.name,
@@ -387,6 +368,7 @@ const layer = Layer.effect(
               return
             }
 
+            const agent = yield* agents.get(ctx.assistantMessage.agent)
             yield* permission.ask({
               permission: "doom_loop",
               patterns: [value.name],

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "version": "1.18.25",
-  "name": "humancode",
+  "name": "opencode",
   "type": "module",
   "license": "MIT",
   "private": true,
@@ -16,7 +16,7 @@
     "dev:temporary": "bun run --conditions=browser ./src/temporary.ts"
   },
   "bin": {
-    "humancode": "./bin/humancode"
+    "opencode": "./bin/opencode"
   },
   "exports": {
     "./*": "./src/*.ts"
@@ -150,8 +150,7 @@
     "ws": "8.21.0",
     "xdg-basedir": "5.1.0",
     "yargs": "18.0.0",
-    "zod": "catalog:",
-    "@opencode-ai/debugger": "workspace:*"
+    "zod": "catalog:"
   },
   "overrides": {
     "drizzle-orm": "catalog:"

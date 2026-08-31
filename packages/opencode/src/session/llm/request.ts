@@ -16,7 +16,6 @@ import type { Plugin } from "@/plugin"
 import { mergeDeep } from "remeda"
 import { MODE_CONSTRAINTS } from "@/agent/mode-constraints"
 import BASE_OPERATIONS from "@/agent/prompt/base-operations.txt"
-import { SocraticPhase } from "../socratic-phase"
 
 const USER_AGENT = `opencode/${InstallationVersion}`
 
@@ -33,9 +32,7 @@ export function wrapModePrompt(agent: { name: string; prompt?: string }) {
     `</CRITICAL-INSTRUCTION>`,
     "",
     BASE_OPERATIONS,
-  ]
-    .filter((x) => x !== undefined)
-    .join("\n")
+  ].join("\n")
 }
 
 type PrepareInput = {
@@ -78,11 +75,7 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
   const isOpenaiOauth = input.provider.id === "openai" && input.auth?.type === "oauth"
   const system = [
     [
-      ...(wrapModePrompt(input.agent)
-        ? [wrapModePrompt(input.agent)!]
-        : input.agent.prompt
-          ? [input.agent.prompt]
-          : SystemPrompt.provider(input.model)),
+      ...(wrapModePrompt(input.agent) ? [wrapModePrompt(input.agent)!] : SystemPrompt.provider(input.model)),
       ...input.system,
       ...(input.user.system ? [input.user.system] : []),
     ]
@@ -230,21 +223,12 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
   }
 })
 
-function resolveTools(input: Pick<PrepareInput, "tools" | "agent" | "permission" | "user" | "sessionID">) {
+function resolveTools(input: Pick<PrepareInput, "tools" | "agent" | "permission" | "user">) {
   const disabled = Permission.disabled(
     Object.keys(input.tools),
     Permission.merge(input.agent.permission, input.permission ?? []),
   )
-  let phaseAllowed: Set<string> | null = null
-  if (SocraticPhase.isSocraticAgent(input.agent.name)) {
-    const state = SocraticPhase.getOrCreate(input.sessionID)
-    phaseAllowed = new Set(SocraticPhase.toolsForPhase(state.currentPhase))
-  }
-  return Record.filter(
-    input.tools,
-    (_, k) =>
-      input.user.tools?.[k] !== false && !disabled.has(k) && (phaseAllowed === null || phaseAllowed.has(k)),
-  )
+  return Record.filter(input.tools, (_, k) => input.user.tools?.[k] !== false && !disabled.has(k))
 }
 
 export function hasToolCalls(messages: ModelMessage[]): boolean {

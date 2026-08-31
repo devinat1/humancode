@@ -1,7 +1,7 @@
-export const deepLinkEvent = "humancode:deep-link"
+export const deepLinkEvent = "opencode:deep-link"
 
 const parseUrl = (input: string) => {
-  if (!input.startsWith("humancode://")) return
+  if (!input.startsWith("opencode://")) return
   if (typeof URL.canParse === "function" && !URL.canParse(input)) return
   try {
     return new URL(input)

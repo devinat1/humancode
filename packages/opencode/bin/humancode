@@ -5,32 +5,51 @@ const fs = require("fs")
 const path = require("path")
 const os = require("os")
 
-function run(target) {
-  // On Windows, tell the child process whether the parent's stdin is a real TTY.
-  // Node.js spawnSync can create internal pipes for stdio: "inherit", causing the
-  // Bun compiled binary to misdetect stdin as a pipe instead of a console handle.
-  if (process.platform === "win32") {
-    process.env.OPENCODE_STDIN_IS_TTY = process.stdin.isTTY ? "1" : "0"
-  }
+const forwardedSignals = ["SIGINT", "SIGTERM", "SIGHUP"]
 
-  const result = childProcess.spawnSync(target, process.argv.slice(2), {
+function run(target) {
+  const child = childProcess.spawn(target, process.argv.slice(2), {
     stdio: "inherit",
   })
-  if (result.error) {
-    console.error(result.error.message)
+
+  child.on("error", (error) => {
+    console.error(error.message)
     process.exit(1)
+  })
+
+  const forwarders = {}
+  for (const signal of forwardedSignals) {
+    forwarders[signal] = () => {
+      try {
+        child.kill(signal)
+      } catch {
+        // The child may have already exited.
+      }
+    }
+    process.on(signal, forwarders[signal])
   }
-  const code = typeof result.status === "number" ? result.status : 0
-  process.exit(code)
+
+  child.on("exit", (code, signal) => {
+    for (const forwardedSignal of forwardedSignals) {
+      process.removeListener(forwardedSignal, forwarders[forwardedSignal])
+    }
+
+    if (signal) {
+      process.kill(process.pid, signal)
+      return
+    }
+
+    process.exit(typeof code === "number" ? code : 0)
+  })
 }
 
 const envPath = process.env.OPENCODE_BIN_PATH
-if (envPath) {
-  run(envPath)
-}
 
 const scriptPath = fs.realpathSync(__filename)
 const scriptDir = path.dirname(scriptPath)
+
+//
+const cached = path.join(scriptDir, ".opencode")
 
 const platformMap = {
   darwin: "darwin",
@@ -51,8 +70,8 @@ let arch = archMap[os.arch()]
 if (!arch) {
   arch = os.arch()
 }
-const base = "humancode-" + platform + "-" + arch
-const binary = platform === "windows" ? "humancode.exe" : "humancode"
+const base = "opencode-" + platform + "-" + arch
+const binary = platform === "windows" ? "opencode.exe" : "opencode"
 
 function supportsAvx2() {
   if (arch !== "x64") return false
@@ -146,13 +165,6 @@ const names = (() => {
     if (baseline) return [`${base}-baseline`, base]
     return [base, `${base}-baseline`]
   }
-
-  // Windows ARM64 can run x64 binaries via emulation — fall back to x64 variants
-  if (platform === "windows" && arch === "arm64") {
-    const x64Base = "humancode-windows-x64"
-    return [base, `${x64Base}-baseline`, x64Base]
-  }
-
   return [base]
 })()
 
@@ -174,10 +186,10 @@ function findBinary(startDir) {
   }
 }
 
-const resolved = findBinary(scriptDir)
+const resolved = envPath || (fs.existsSync(cached) ? cached : findBinary(scriptDir))
 if (!resolved) {
   console.error(
-    "It seems that your package manager failed to install the right version of the humancode CLI for your platform. You can try manually installing " +
+    "It seems that your package manager failed to install the right version of the opencode CLI for your platform. You can try manually installing " +
       names.map((n) => `\"${n}\"`).join(" or ") +
       " package",
   )
