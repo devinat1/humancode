@@ -48,6 +48,11 @@ it.instance("returns default native agents when no config", () =>
   Effect.gen(function* () {
     const agents = yield* load((svc) => svc.list())
     const names = agents.map((a) => a.name)
+    expect(names).toContain("pair")
+    expect(names).toContain("socratic")
+    expect(names).toContain("vibe")
+    expect(names).toContain("claw")
+    expect(names).toContain("adaptive")
     expect(names).toContain("build")
     expect(names).toContain("plan")
     expect(names).toContain("general")
@@ -55,6 +60,28 @@ it.instance("returns default native agents when no config", () =>
     expect(names).toContain("compaction")
     expect(names).toContain("title")
     expect(names).toContain("summary")
+    expect(names).toContain("review")
+  }),
+)
+
+it.instance("HumanCode primary agents are visible and build/plan stay hidden", () =>
+  Effect.gen(function* () {
+    const agents = yield* load((svc) => svc.list())
+    const visible = agents.filter((a) => a.mode !== "subagent" && a.hidden !== true).map((a) => a.name)
+    expect(visible).toEqual(["adaptive", "claw", "pair", "socratic", "vibe"])
+    expect((yield* load((svc) => svc.get("build")))?.hidden).toBe(true)
+    expect((yield* load((svc) => svc.get("plan")))?.hidden).toBe(true)
+  }),
+)
+
+it.instance("socratic is the guided debug agent", () =>
+  Effect.gen(function* () {
+    const socratic = yield* load((svc) => svc.get("socratic"))
+    expect(socratic?.mode).toBe("primary")
+    expect(socratic?.hidden).toBeUndefined()
+    expect(socratic?.description).toContain("breakpoint")
+    expect(evalPerm(socratic, "edit")).toBe("deny")
+    expect(evalPerm(socratic, "write")).toBe("deny")
   }),
 )
 
@@ -646,31 +673,31 @@ it.instance(
   },
 )
 
-it.instance("defaultAgent returns build when no default_agent config", () =>
+it.instance("defaultAgent returns adaptive when no default_agent config", () =>
   Effect.gen(function* () {
     const agent = yield* load((svc) => svc.defaultAgent())
-    expect(agent).toBe("build")
+    expect(agent).toBe("adaptive")
   }),
 )
 
-it.instance("defaultInfo returns resolved build agent when no default_agent config", () =>
+it.instance("defaultInfo returns resolved adaptive agent when no default_agent config", () =>
   Effect.gen(function* () {
     const agent = yield* load((svc) => svc.defaultInfo())
-    expect(agent.name).toBe("build")
+    expect(agent.name).toBe("adaptive")
     expect(agent.mode).toBe("primary")
   }),
 )
 
 it.instance(
-  "defaultAgent respects default_agent config set to plan",
+  "defaultAgent respects default_agent config set to socratic",
   () =>
     Effect.gen(function* () {
       const agent = yield* load((svc) => svc.defaultAgent())
-      expect(agent).toBe("plan")
+      expect(agent).toBe("socratic")
     }),
   {
     config: {
-      default_agent: "plan",
+      default_agent: "socratic",
     },
   },
 )
@@ -725,17 +752,16 @@ it.instance(
 )
 
 it.instance(
-  "defaultAgent returns plan when build is disabled and default_agent not set",
+  "defaultAgent returns pair when adaptive is disabled and default_agent not set",
   () =>
     Effect.gen(function* () {
       const agent = yield* load((svc) => svc.defaultAgent())
-      // build is disabled, so it should return plan (next primary agent)
-      expect(agent).toBe("plan")
+      expect(agent).toBe("pair")
     }),
   {
     config: {
       agent: {
-        build: { disable: true },
+        adaptive: { disable: true },
       },
     },
   },
@@ -747,8 +773,11 @@ it.instance(
   {
     config: {
       agent: {
-        build: { disable: true },
-        plan: { disable: true },
+        pair: { disable: true },
+        socratic: { disable: true },
+        vibe: { disable: true },
+        claw: { disable: true },
+        adaptive: { disable: true },
       },
     },
   },
